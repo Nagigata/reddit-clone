@@ -26,6 +26,7 @@ const Recommendation: React.FC = () => {
   const { communityStateValue, onJoinOrCommunity } = useCommunityData();
   const bg = useColorModeValue("white", "#1A202C");
   const borderColor = useColorModeValue("gray.300", "#2D3748");
+  const hoverBg = useColorModeValue("gray.50", "gray.700");
 
   const getCommunityRecommendation = async () => {
     setLoading(true);
@@ -66,23 +67,36 @@ const Recommendation: React.FC = () => {
     <Flex
       direction="column"
       bg={bg}
-      borderRadius={4}
+      borderRadius={8}
       cursor="pointer"
       border="1px solid"
       borderColor={borderColor}
+      boxShadow="0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)"
+      overflow="hidden"
+      mb={4}
     >
       <Flex
         align="flex-end"
         color="white"
         p="6px 10px"
-        bg="blue.500"
+        bgGradient="linear(to-r, blue.500, blue.600)"
         height="70px"
-        borderRadius="4px 4px 0px 0px"
+        borderRadius="8px 8px 0px 0px"
         fontWeight={600}
         bgImage="url(/images/recCommsArt.png)"
         backgroundSize="cover"
-        bgGradient="linear-gradient(to bottom, rgba(0, 0, 0, 0), rgba(0, 0, 0, 0.75)),
-        url('images/xw6wqhhjubh31.webp')"
+        backgroundPosition="center"
+        position="relative"
+        _before={{
+          content: '""',
+          position: "absolute",
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          bgGradient: "linear(to-b, transparent, rgba(0, 0, 0, 0.6))",
+          borderRadius: "8px 8px 0px 0px",
+        }}
       >
         Top Communities
       </Flex>
@@ -118,6 +132,8 @@ const Recommendation: React.FC = () => {
                     borderColor={borderColor}
                     p="10px 12px"
                     fontWeight={600}
+                    _hover={{ bg: hoverBg }}
+                    transition="background-color 0.2s ease-in-out"
                   >
                     <Flex width="80%" align="center">
                       <Flex width="15%">
@@ -168,6 +184,8 @@ const Recommendation: React.FC = () => {
                 onClick={() =>
                   isViewAll ? setIsViewAll(false) : setIsViewAll(true)
                 }
+                _hover={{ transform: "translateY(-1px)", boxShadow: "md" }}
+                transition="all 0.2s ease-in-out"
               >
                 {isViewAll ? "Collapse Items" : "View All"}
               </Button>

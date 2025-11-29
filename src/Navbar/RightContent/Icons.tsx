@@ -7,9 +7,9 @@ import { BsArrowUpRightCircle, BsChatDots } from "react-icons/bs";
 import { GrAdd } from "react-icons/gr";
 import {
   IoFilterCircleOutline,
-  IoNotificationsOutline,
   IoVideocamOutline,
 } from "react-icons/io5";
+import NotificationBell from "../../components/Notifications/NotificationBell";
 
 const animationKeyframes = keyframes`
   0% { transform: scale(1) rotate(0); border-radius: 20%; }
@@ -27,7 +27,7 @@ const Icons: React.FC = () => {
 
   return (
     <Flex>
-      <Flex
+      {/* <Flex
         display={{ base: "none", md: "flex" }}
         align="center"
         borderRadius="1px solid"
@@ -63,9 +63,9 @@ const Icons: React.FC = () => {
         >
           <Icon as={IoVideocamOutline} fontSize={22} />
         </Flex>
-      </Flex>
+      </Flex> */}
       <>
-        <Flex
+        {/* <Flex
           mr={1.5}
           ml={1.5}
           padding={1}
@@ -87,18 +87,11 @@ const Icons: React.FC = () => {
             New
           </Text>
           <Icon as={BsChatDots} fontSize={20} />
-        </Flex>
-        <Flex
-          mr={1.5}
-          ml={1.5}
-          padding={1}
-          cursor="pointer"
-          borderRadius={4}
-          _hover={{ bg: hoverBg }}
-        >
-          <Icon as={IoNotificationsOutline} fontSize={20} />
-        </Flex>
-        <Flex
+        </Flex> */}
+        
+
+        <NotificationBell />
+        {/* <Flex
           display={{ base: "none", md: "flex" }}
           mr={1.5}
           ml={1.5}
@@ -108,7 +101,7 @@ const Icons: React.FC = () => {
           _hover={{ bg: hoverBg }}
         >
           <Icon as={GrAdd} fontSize={20} />
-        </Flex>
+        </Flex> */}
       </>
     </Flex>
   );

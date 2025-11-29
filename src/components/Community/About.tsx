@@ -36,6 +36,7 @@ const About: React.FC<AboutProps> = ({ communityData }) => {
   const [uploadingImage, setUploadingImage] = useState(false);
   const setCommunityStateValue = useSetRecoilState(CommunityState);
   const bg = useColorModeValue("white", "#1A202C");
+  const borderColor = useColorModeValue("gray.200", "gray.700");
 
   const onUploadingImage = async () => {
     if (!selectedFile) return;
@@ -67,17 +68,27 @@ const About: React.FC<AboutProps> = ({ communityData }) => {
       <Flex
         justify="space-between"
         align="center"
-        bg="blue.400"
+        bgGradient="linear(to-r, blue.400, blue.500)"
         color="white"
         p={3}
-        borderRadius="4px 4px 0px 0px"
+        borderRadius="8px 8px 0px 0px"
+        boxShadow="0 1px 3px 0 rgba(0, 0, 0, 0.1)"
       >
         <Text fontSize="10pt" fontWeight={700}>
           About Community
         </Text>
         <Icon as={HiOutlineDotsHorizontal} cursor="pointer" />
       </Flex>
-      <Flex direction="column" p={3} bg={bg} borderRadius="0px 0px 4px 4px">
+      <Flex 
+        direction="column" 
+        p={3} 
+        bg={bg} 
+        borderRadius="0px 0px 8px 8px"
+        boxShadow="0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)"
+        border="1px solid"
+        borderColor={borderColor}
+        borderTop="none"
+      >
         <Stack>
           <Flex width="100%" p={2} fontSize="10pt" fontWeight={700}>
             <Flex direction="column" flexGrow={1}>
@@ -111,7 +122,13 @@ const About: React.FC<AboutProps> = ({ communityData }) => {
             )}
           </Flex>
           <Link href={`/r/${communityData.id}/submit`}>
-            <Button mt={3} height="30px">
+            <Button 
+              mt={3} 
+              height="30px"
+              width="100%"
+              _hover={{ transform: "translateY(-1px)", boxShadow: "md" }}
+              transition="all 0.2s ease-in-out"
+            >
               Create Post
             </Button>
           </Link>

@@ -7,6 +7,7 @@ import {
   useColorModeValue,
 } from "@chakra-ui/react";
 import React from "react";
+import FactCheckResult from "./FactCheckResult";
 
 type TextInputProps = {
   textInputs: {
@@ -62,6 +63,10 @@ const TextInput: React.FC<TextInputProps> = ({
           borderColor: searchBorder,
         }}
       />
+      
+      {/* Fact Check Component */}
+      <FactCheckResult title={textInputs.title} body={textInputs.body} />
+      
       <Flex justify="flex-end">
         <Button
           height="34px"

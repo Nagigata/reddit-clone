@@ -63,7 +63,7 @@ function ProfileTopBar({}: Props) {
         bg={hoverBg}
       >
         <Icon as={GoGraph} fontSize={20} color="blue.500" />
-        <Text color="blue.500">New</Text>
+        {/* <Text color="blue.500">New</Text> */}
       </Flex>
       <Flex
         mr={1.5}

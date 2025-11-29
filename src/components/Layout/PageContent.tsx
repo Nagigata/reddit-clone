@@ -11,7 +11,7 @@ const PageContent: React.FC<PageContentProps> = ({ children }) => {
   const uid = router.query;
 
   return (
-    <Flex justify="center" p="16px 0px">
+    <Flex justify="center" p="20px 0px">
       <Flex
         width="95%"
         justify="center"

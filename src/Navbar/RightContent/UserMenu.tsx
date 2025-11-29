@@ -20,6 +20,7 @@ import { VscAccount } from "react-icons/vsc";
 
 import { useRouter } from "next/router";
 import { IoSparkles } from "react-icons/io5";
+import { IoNotificationsOutline } from "react-icons/io5";
 import { useSetRecoilState } from "recoil";
 import { authModelState } from "../../atoms/authModalAtom";
 import { auth } from "../../firebase/clientApp";
@@ -76,10 +77,10 @@ const UserMenu: React.FC<UserMenuProps> = ({ user }) => {
                   <Text fontWeight={700}>
                     {user?.displayName || user?.email?.split("@")[0]}
                   </Text>
-                  <Flex alignItems="center">
+                  {/* <Flex alignItems="center">
                     <Icon as={IoSparkles} color="brand.100" mr={1} />
                     <Text color="gray.400">1 karma</Text>
-                  </Flex>
+                  </Flex> */}
                 </Flex>
               </>
             ) : (
@@ -110,6 +111,17 @@ const UserMenu: React.FC<UserMenuProps> = ({ user }) => {
               <Flex align="center" onClick={handelNavigatePage}>
                 <Icon fontSize={20} mr={2} as={CgProfile} />
                 Profile
+              </Flex>
+            </MenuItem>
+            <MenuItem
+              fontSize="10px"
+              fontWeight={700}
+              _hover={{ bg: "blue.500", color: "white" }}
+              onClick={() => router.push('/notifications')}
+            >
+              <Flex align="center">
+                <Icon fontSize={20} mr={2} as={IoNotificationsOutline} />
+                Notification Settings
               </Flex>
             </MenuItem>
             <MenuDivider />

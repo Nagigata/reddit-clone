@@ -31,18 +31,24 @@ const SearchInput: React.FC<SearchInputProps> = ({ user }) => {
           placeholder="Search Reddit"
           fontSize="10pt"
           bg={bg}
-          _placeholder={{ colors: "gray.500" }}
+          borderRadius={20}
+          border="1px solid"
+          borderColor="transparent"
+          _placeholder={{ color: "gray.500" }}
           _hover={{
             bg: focusedInputBg,
             border: "1px solid",
             borderColor: searchBorder,
+            boxShadow: "0 1px 2px 0 rgba(0, 0, 0, 0.05)",
           }}
           _focus={{
             outline: "none",
             border: "1px solid",
-            borderColor: searchBorder,
+            borderColor: "blue.500",
             bg: focusedInputBg,
+            boxShadow: "0 0 0 3px rgba(66, 153, 225, 0.1)",
           }}
+          transition="all 0.2s ease-in-out"
         />
       </InputGroup>
     </Flex>

@@ -83,6 +83,12 @@ const Navbar: React.FC = () => {
       height="44px"
       padding="6px 12px"
       justify={{ md: "space-between" }}
+      boxShadow="0 1px 2px 0 rgba(0, 0, 0, 0.05)"
+      position="sticky"
+      top={0}
+      zIndex={1000}
+      borderBottom="1px solid"
+      borderColor={useColorModeValue("gray.200", "gray.700")}
     >
       <Flex
         align="center"
@@ -90,6 +96,8 @@ const Navbar: React.FC = () => {
         mr={{ base: 0, md: 2 }}
         cursor="pointer"
         onClick={() => onSelectMenuItem(defaultMenuItem)}
+        _hover={{ opacity: 0.8 }}
+        transition="opacity 0.2s ease-in-out"
       >
         <Image src="/images/redditFace.svg" height="30px" />
         <Image

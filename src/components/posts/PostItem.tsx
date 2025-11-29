@@ -67,13 +67,13 @@ const PostItem: React.FC<PostItemProps> = ({
   const singlePostPage = !onSelectPost;
   const router = useRouter();
 
-  // Thames
+  // Themes
   const bg = useColorModeValue("white", "#1A202C");
   const borderColor = useColorModeValue("gray.300", "#2D3748");
   const singlePageBorderColor = useColorModeValue("white", "#2D3748");
   const voteLineBorderColor = useColorModeValue("gray.100", "#171923");
   const IconHoverBg = useColorModeValue("gray.200", "#2A4365");
-  const IconBg = useColorModeValue("none", "#A0AEC0");
+  const IconBg = useColorModeValue("gray.500", "#A0AEC0");
   const voteIconBg = useColorModeValue("gray.400", "#CBD5E0");
 
   const handleDelete = async (
@@ -136,10 +136,17 @@ const PostItem: React.FC<PostItemProps> = ({
       border="1px solid"
       bg={bg}
       borderColor={singlePostPage ? singlePageBorderColor : borderColor}
-      borderRadius={singlePostPage ? "4px 4px 0px 0px" : "4px"}
-      _hover={{ borderColor: singlePostPage ? "none" : borderColor }}
+      borderRadius={singlePostPage ? "4px 4px 0px 0px" : "8px"}
+      _hover={{ 
+        borderColor: singlePostPage ? "none" : borderColor,
+        boxShadow: singlePostPage ? "none" : "0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)",
+        transform: singlePostPage ? "none" : "translateY(-2px)",
+      }}
+      transition="all 0.2s ease-in-out"
       cursor={singlePostPage ? "unset" : "pointer"}
       onClick={() => onSelectPost && onSelectPost(post)}
+      boxShadow={singlePostPage ? "none" : "0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)"}
+      mb={singlePostPage ? 0 : 3}
     >
       <Flex
         direction="column"
@@ -157,6 +164,8 @@ const PostItem: React.FC<PostItemProps> = ({
           fontSize={22}
           onClick={(event) => onVote(event, post, 1, post.communityId)}
           cursor="pointer"
+          _hover={{ transform: "scale(1.1)", color: "brand.100" }}
+          transition="all 0.2s ease-in-out"
         />
         <Text fontSize="9pt" color={voteIconBg}>
           {post.voteStatus}
@@ -171,6 +180,8 @@ const PostItem: React.FC<PostItemProps> = ({
           fontSize={22}
           onClick={(event) => onVote(event, post, -1, post.communityId)}
           cursor="pointer"
+          _hover={{ transform: "scale(1.1)", color: "#4379ff" }}
+          transition="all 0.2s ease-in-out"
         />
       </Flex>
       <Flex direction="column" width="100%">
@@ -234,8 +245,9 @@ const PostItem: React.FC<PostItemProps> = ({
             align="center"
             p="8px 10px"
             borderRadius={4}
-            _hover={{ bg: IconHoverBg }}
+            _hover={{ bg: IconHoverBg, transform: "scale(1.05)" }}
             cursor="pointer"
+            transition="all 0.2s ease-in-out"
           >
             <Icon as={BsChat} mr={2} color={IconBg} />
             <Text fontSize="9pt" color={IconBg}>
@@ -246,8 +258,9 @@ const PostItem: React.FC<PostItemProps> = ({
             align="center"
             p="8px 10px"
             borderRadius={4}
-            _hover={{ bg: IconHoverBg }}
+            _hover={{ bg: IconHoverBg, transform: "scale(1.05)" }}
             cursor="pointer"
+            transition="all 0.2s ease-in-out"
           >
             <Icon as={IoArrowRedoOutline} mr={2} color={IconBg} />
             <Text fontSize="9pt" color={IconBg}>
@@ -258,8 +271,9 @@ const PostItem: React.FC<PostItemProps> = ({
             align="center"
             p="8px 10px"
             borderRadius={4}
-            _hover={{ bg: IconHoverBg }}
+            _hover={{ bg: IconHoverBg, transform: "scale(1.05)" }}
             cursor="pointer"
+            transition="all 0.2s ease-in-out"
           >
             <Icon as={IoBookmarkOutline} mr={2} color={IconBg} />
             <Text fontSize="9pt" color={IconBg}>

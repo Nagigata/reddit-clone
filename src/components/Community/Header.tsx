@@ -26,7 +26,11 @@ const Header: React.FC<HeaderProps> = ({ communityData }) => {
 
   return (
     <Flex direction="column" width="100%" height="146px">
-      <Box height="50%" bg="blue.400" />
+      <Box 
+        height="50%" 
+        bgGradient="linear(to-r, blue.400, blue.500)"
+        boxShadow="inset 0 -1px 0 0 rgba(0, 0, 0, 0.1)"
+      />
       <Flex justifyContent="center" bg={bg} height="50%">
         <Flex width="95%" maxWidth="860px">
           {communityStateValue.currentCommunity?.imageURL ? (
@@ -69,6 +73,8 @@ const Header: React.FC<HeaderProps> = ({ communityData }) => {
               onClick={() => {
                 onJoinOrCommunity(communityData, isJoined);
               }}
+              _hover={{ transform: "translateY(-1px)", boxShadow: "md" }}
+              transition="all 0.2s ease-in-out"
             >
               {isJoined ? "Joined" : "Join"}
             </Button>
