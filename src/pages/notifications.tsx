@@ -10,7 +10,9 @@ import {
   Spinner,
 } from '@chakra-ui/react';
 import { useRouter } from 'next/router';
+import { GetServerSideProps } from 'next';
 import { useAuthState } from 'react-firebase-hooks/auth';
+import { useEffect, useState } from 'react';
 import { auth } from '../firebase/clientApp';
 import { useNotifications } from '../hooks/useNotifications';
 
@@ -18,10 +20,21 @@ import { useNotifications } from '../hooks/useNotifications';
 type BooleanPreferenceKey = 'inApp' | 'email' | 'push';
 
 const NotificationsPage: React.FC = () => {
-  const [user] = useAuthState(auth);
+  const [user, loadingUser] = useAuthState(auth);
   const router = useRouter();
   const toast = useToast();
   const { preferences, updatePreferences, loading } = useNotifications();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (mounted && !loadingUser && !user) {
+      router.push('/');
+    }
+  }, [mounted, loadingUser, user, router]);
 
   const handlePreferenceChange = async (key: BooleanPreferenceKey, value: boolean) => {
     if (!preferences) return;
@@ -44,8 +57,18 @@ const NotificationsPage: React.FC = () => {
     }
   };
 
+  // Show loading or nothing during SSR and initial mount
+  if (!mounted || loadingUser) {
+    return (
+      <Container maxW="container.md" py={8}>
+        <Box textAlign="center">
+          <Spinner size="xl" />
+        </Box>
+      </Container>
+    );
+  }
+
   if (!user) {
-    router.push('/');
     return null;
   }
 
@@ -112,3 +135,10 @@ const NotificationsPage: React.FC = () => {
 };
 
 export default NotificationsPage;
+
+// Disable static generation for this page
+export const getServerSideProps: GetServerSideProps = async () => {
+  return {
+    props: {},
+  };
+};
