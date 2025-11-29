@@ -6,7 +6,6 @@ import {
   HStack,
   Switch,
   Text,
-  Button,
   useToast,
   Spinner,
 } from '@chakra-ui/react';
@@ -15,13 +14,16 @@ import { useAuthState } from 'react-firebase-hooks/auth';
 import { auth } from '../firebase/clientApp';
 import { useNotifications } from '../hooks/useNotifications';
 
+
+type BooleanPreferenceKey = 'inApp' | 'email' | 'push';
+
 const NotificationsPage: React.FC = () => {
   const [user] = useAuthState(auth);
   const router = useRouter();
   const toast = useToast();
   const { preferences, updatePreferences, loading } = useNotifications();
 
-  const handlePreferenceChange = async (key: keyof typeof preferences, value: boolean | string) => {
+  const handlePreferenceChange = async (key: BooleanPreferenceKey, value: boolean) => {
     if (!preferences) return;
 
     try {
