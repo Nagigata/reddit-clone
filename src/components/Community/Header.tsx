@@ -21,7 +21,7 @@ const Header: React.FC<HeaderProps> = ({ communityData }) => {
   const { communityStateValue, onJoinOrCommunity, loading } =
     useCommunityData();
   const isJoined = !!communityStateValue.mySnippets.find(
-    (item) => item.communityId === communityData.id
+    (item) => item.communityId === communityData.community_id
   );
 
   return (
@@ -29,11 +29,11 @@ const Header: React.FC<HeaderProps> = ({ communityData }) => {
       <Box height="50%" bg="blue.400" />
       <Flex justifyContent="center" bg={bg} height="50%">
         <Flex width="95%" maxWidth="860px">
-          {communityStateValue.currentCommunity?.imageURL ? (
+          {communityStateValue.currentCommunity?.avatar ? (
             <Image
               borderRadius="full"
               boxSize="66px"
-              src={communityStateValue.currentCommunity.imageURL}
+              src={communityStateValue.currentCommunity.avatar}
               alt="profile Image"
               position="relative"
               top={-3}
@@ -54,10 +54,10 @@ const Header: React.FC<HeaderProps> = ({ communityData }) => {
           <Flex padding="10px 16px">
             <Flex direction="column" mr={6}>
               <Text fontWeight={800} fontSize="16px">
-                {communityData.id}
+                {communityData.name}
               </Text>
               <Text fontWeight={600} fontSize="10px" color="gray.500">
-                r/{communityData.id}
+                r/{communityData.name}
               </Text>
             </Flex>
             <Button

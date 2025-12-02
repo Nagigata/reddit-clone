@@ -6,6 +6,8 @@ import { useSetRecoilState } from "recoil";
 import { authModelState } from "../../../atoms/authModalAtom";
 import { auth } from "../../../firebase/clientApp";
 import { FIREBASE_ERRORS } from "../../../firebase/errors";
+import axios from "axios";
+import { useUser } from "../../../context/userContext";
 
 type LoginProps = {};
 
@@ -15,17 +17,38 @@ const Login: React.FC<LoginProps> = () => {
     email: "",
     password: "",
   });
+  const { accessToken, setEmail, setAccessToken, setRefreshToken } = useUser();
   const searchBorder = useColorModeValue("blue.500", "#4A5568");
   const inputBg = useColorModeValue("gray.50", "#4A5568");
   const focusedInputBg = useColorModeValue("white", "#2D3748");
   const placeholderColor = useColorModeValue("gray.500", "#CBD5E0");
 
-  const [signInWithEmailAndPassword, user, loading, error] =
-    useSignInWithEmailAndPassword(auth);
+  const LoginFunc = async () => {
+    try {
+      const response = await axios.post(
+        `${process.env.NEXT_PUBLIC_API_BASE_URL}/users/login`,
+        JSON.stringify({
+          email: loginForm.email,
+          password: loginForm.password
+        }),
+        {
+          headers: {
+            "Content-Type": "application/json"
+          }
+        }
+      );
+      setEmail(loginForm.email);
+      setAccessToken(response.data.access_token);
+      setRefreshToken(response.data.refresh_token);
+    } catch(error: any) {
+      console.log(">>> Error login: ", error);
+    }
+  }
 
-  const onSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+  const onSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    signInWithEmailAndPassword(loginForm.email, loginForm.password);
+    await LoginFunc();
+    console.log(">>> access: ", accessToken)
   };
 
   const onChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -82,16 +105,12 @@ const Login: React.FC<LoginProps> = () => {
         }}
         bg={inputBg}
       />
-      <Text textAlign="center" color="red" fontSize="10pt">
-        {FIREBASE_ERRORS[error?.message as keyof typeof FIREBASE_ERRORS]}
-      </Text>
       <Button
         width="100%"
         height="36px"
         mt={2}
         mb={2}
         type="submit"
-        isLoading={loading}
       >
         Log In
       </Button>

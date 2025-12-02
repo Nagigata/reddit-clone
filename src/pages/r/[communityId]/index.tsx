@@ -13,7 +13,8 @@ import Header from "../../../components/Community/Header";
 import NotFound from "../../../components/Community/NotFound";
 import PageContent from "../../../components/Layout/PageContent";
 import Posts from "../../../components/posts/Posts";
-import { firestore } from "../../../firebase/clientApp";
+import axios from "axios";
+import Members from "../../../components/Community/Members";
 
 type CommunityProps = {
   communityData: Community;
@@ -53,6 +54,7 @@ const CommunityPage: React.FC<CommunityProps> = ({ communityData }) => {
         </>
         <>
           <About communityData={communityData} />
+          <Members communityData={communityData} />
         </>
       </PageContent>
     </motion.div>
@@ -60,26 +62,26 @@ const CommunityPage: React.FC<CommunityProps> = ({ communityData }) => {
 };
 
 export async function getServerSideProps(context: GetServerSidePropsContext) {
-  // get data and pass
   try {
-    const communityDocRef = doc(
-      firestore,
-      "communities",
-      context.query.communityId as string
+    const { communityId } = context.query;
+
+    const res = await axios.get(
+      `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/community/${communityId}`
     );
-    const communityDoc = await getDoc(communityDocRef);
 
     return {
       props: {
-        communityData: communityDoc.exists()
-          ? JSON.parse(
-              safeJsonStringify({ id: communityDoc.id, ...communityDoc.data() })
-            )
-          : "",
+        communityData: res.data || null,
       },
     };
-  } catch (error) {
-    console.log("GetServerSideProps Error", error);
+  } catch (error: any) {
+    console.error("GetServerSideProps Error:", error.response?.data || error.message);
+    return {
+      props: {
+        communityData: null,
+      },
+    };
   }
 }
+
 export default CommunityPage;

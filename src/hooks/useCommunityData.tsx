@@ -1,13 +1,4 @@
-import {
-  collection,
-  doc,
-  getDoc,
-  getDocs,
-  increment,
-  serverTimestamp,
-  Timestamp,
-  writeBatch,
-} from "firebase/firestore";
+import axios from "axios";
 import { useRouter } from "next/router";
 import { useEffect, useState } from "react";
 import { useAuthState } from "react-firebase-hooks/auth";
@@ -18,7 +9,7 @@ import {
   CommunitySnippet,
   CommunityState,
 } from "../atoms/CommunitiesAtom";
-import { auth, firestore } from "../firebase/clientApp";
+import { auth } from "../firebase/clientApp";
 
 const useCommunityData = () => {
   const [user] = useAuthState(auth);
@@ -29,59 +20,132 @@ const useCommunityData = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
+  // 👉 Xử lý khi click Join / Leave
   const onJoinOrCommunity = (communityData: Community, isJoined: boolean) => {
     if (!user) {
-      // model
       setAuthModelState({ open: true, view: "login" });
       return;
     }
 
     if (isJoined) {
-      leaveCommunity(communityData.id);
+      leaveCommunity(communityData.community_id);
       return;
     }
     joinCommunity(communityData);
   };
 
+  // 👉 Lấy danh sách community mà user đã tham gia
   const getMySnippets = async () => {
+    if (!user) return;
+
     setLoading(true);
     try {
-      const snippetDocs = await getDocs(
-        collection(firestore, `users/${user?.uid}/communitySnippets`)
+      const res = await axios.get(
+        `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/community/joined-community/1`
+        // `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/community/joined-community/${user.uid}`
       );
-      const snippets = snippetDocs.docs.map((doc) => ({ ...doc.data() }));
+
+      // API trả về mảng các community mà user đã tham gia
+      const snippets = res.data.map((item: any) => ({
+        communityId: item.community_id,
+        imageURL: item.avatar || "",
+        communityName: item?.name,
+        isModerator: item.created_by === 1,
+        statusCommunity: item?.status
+      }));
 
       setCommunityStateValue((prev) => ({
         ...prev,
         mySnippets: snippets as CommunitySnippet[],
         snippetsFetched: true,
       }));
-
-      //console.log(snippets, "🙌🚀🚀");
-    } catch (error: any) {
-      console.log("Get My Snippet Error", error);
-      setError(error.message);
+    } catch (err: any) {
+      console.error("Get My Snippets Error:", err);
+      setError(err.message);
     }
     setLoading(false);
   };
 
+  // 👉 Lấy dữ liệu 1 community theo id
   const getCommunityData = async (communityId: string) => {
     try {
-      const communityDocRef = doc(firestore, "communities", communityId);
-      const communityDoc = await getDoc(communityDocRef);
+      const res = await axios.get(
+        `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/community/${communityId}`
+      );
 
       setCommunityStateValue((prev) => ({
         ...prev,
-        currentCommunity: {
-          id: communityDoc.id,
-          ...communityDoc.data(),
-        } as Community,
+        currentCommunity: res.data as Community,
       }));
-    } catch (error) {
-      console.log(error);
+    } catch (err) {
+      console.error("Get Community Data Error:", err);
     }
   };
 
+  // 👉 Tham gia community
+  const joinCommunity = async (communityData: Community) => {
+    if (!user) return;
+    setLoading(true);
+
+    try {
+      await axios.post(
+        `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/community-member`,
+        {
+          community_id: communityData.community_id,
+          user_id: user.uid,
+          role: 'member'
+        }
+      );
+
+      const newSnippet: CommunitySnippet = {
+        communityId: communityData.community_id,
+        imageURL: communityData.avatar || "",
+        communityName: communityData.name,
+        isModerator: 1 === Number(communityData.created_by),
+        statusCommunity: communityData.status
+      };
+
+      setCommunityStateValue((prev) => ({
+        ...prev,
+        mySnippets: [...prev.mySnippets, newSnippet],
+      }));
+    } catch (err: any) {
+      console.error("Join Community Error:", err);
+      setError(err.message);
+    }
+    setLoading(false);
+  };
+
+  // 👉 Rời khỏi community
+  const leaveCommunity = async (communityId: number) => {
+    if (!user) return;
+    setLoading(true);
+
+    try {
+      await axios.delete(
+        `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/community/leave`,
+        {
+          data: {
+            communityId,
+            userId: user.uid,
+          },
+        }
+      );
+
+      setCommunityStateValue((prev) => ({
+        ...prev,
+        mySnippets: prev.mySnippets.filter(
+          (item) => item.communityId !== communityId
+        ),
+      }));
+    } catch (err: any) {
+      console.error("Leave Community Error:", err);
+      setError(err.message);
+    }
+    setLoading(false);
+  };
+
+  // 👉 useEffect để tự load snippets khi có user
   useEffect(() => {
     if (!user) {
       setCommunityStateValue((prev) => ({
@@ -94,113 +158,21 @@ const useCommunityData = () => {
     getMySnippets();
   }, [user]);
 
+  // 👉 useEffect để tự load community hiện tại (nếu vào trang chi tiết)
   useEffect(() => {
     const { communityId } = router.query;
-
     if (communityId && !communityStateValue.currentCommunity) {
       getCommunityData(communityId as string);
     }
   }, [router.query, communityStateValue.currentCommunity]);
 
-  const joinCommunity = async (communityData: Community) => {
-    try {
-      const batch = writeBatch(firestore);
-
-      const newSnippet: CommunitySnippet = {
-        communityId: communityData.id,
-        imageURL: communityData.imageURL || "",
-        isModerator: user?.uid === communityData.creatorId,
-        updateTimeStamp: serverTimestamp() as Timestamp,
-      };
-
-      batch.set(
-        doc(
-          firestore,
-          `users/${user?.uid}/communitySnippets`,
-          communityData.id
-        ),
-        newSnippet
-      );
-
-      batch.update(doc(firestore, "communities", communityData.id), {
-        numberOfMembers: increment(1),
-      });
-
-      await batch.commit();
-
-      setCommunityStateValue((prev) => ({
-        ...prev,
-        mySnippets: [...prev.mySnippets, newSnippet],
-      }));
-
-      updateCommunitySnippet(communityData, user?.uid!);
-    } catch (error: any) {
-      console.log("JoinCommunity Error", error);
-      setError(error.message);
-    }
-    setLoading(false);
-  };
-
-  const updateCommunitySnippet = async (
-    communityData: Community,
-    userId: string
-  ) => {
-    if (!communityData && !userId) return;
-
-    try {
-      const batch = writeBatch(firestore);
-
-      const newSnippet = {
-        userId: userId,
-        userEmail: user?.email,
-      };
-
-      batch.set(
-        doc(
-          firestore,
-          `communities/${communityData.id}/userInCommunity/${userId}`
-        ),
-        newSnippet
-      );
-
-      await batch.commit();
-    } catch (error: any) {
-      console.log("JoinCommunity Error", error);
-      setError(error.message);
-    }
-  };
-
-  const leaveCommunity = async (communityId: string) => {
-    try {
-      const batch = writeBatch(firestore);
-
-      batch.delete(
-        doc(firestore, `users/${user?.uid}/communitySnippets`, communityId)
-      );
-
-      batch.update(doc(firestore, "communities", communityId), {
-        numberOfMembers: increment(-1),
-      });
-
-      await batch.commit();
-
-      setCommunityStateValue((prev) => ({
-        ...prev,
-        mySnippets: prev.mySnippets.filter(
-          (item) => item.communityId !== communityId
-        ),
-      }));
-    } catch (error: any) {
-      console.log("JoinCommunity Error", error);
-      setError(error.message);
-    }
-    setLoading(false);
-  };
-
   return {
     communityStateValue,
     onJoinOrCommunity,
     loading,
+    error,
+    setCommunityStateValue
   };
 };
+
 export default useCommunityData;

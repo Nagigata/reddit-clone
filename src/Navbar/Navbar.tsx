@@ -1,81 +1,74 @@
 import { Flex, Image, useColorMode, useColorModeValue } from "@chakra-ui/react";
 import React, { useEffect, useState } from "react";
-import { useAuthState } from "react-firebase-hooks/auth";
-
-import {
-  doc,
-  getDoc,
-  serverTimestamp,
-  setDoc,
-  Timestamp,
-} from "firebase/firestore";
 import { defaultMenuItem } from "../atoms/directoryMenuAtom";
-import { auth, firestore } from "../firebase/clientApp";
 import useDirectory from "../hooks/useDirectory";
 import Directory from "./Directory/Directory";
 import RightContent from "./RightContent/RightContent";
 import SearchInput from "./SearchInput";
 import { redditProfileImage } from "./store";
+import { useUser } from "../context/userContext";
+import axios from "axios";
 
-interface RedditUserDocument {
-  userId?: string;
-  userName: string;
-  userEmail?: string;
-  userImage: string;
-  redditImage: string;
-  timestamp: Timestamp;
+interface UserProfile {
+  profile_id: number;
+  full_name: string;
+  avatar: string | null;
+  gender: string | null;
+}
+
+export interface User {
+  user_id: number;
+  email: string;
+  is_admin: boolean;
+  profile: UserProfile;
 }
 
 const Navbar: React.FC = () => {
-  const [user, loading, error] = useAuthState(auth);
-  const [redditUserImage, setRedditUserImage] = useState("");
-  const [userCreates, setUserCreate] = useState<boolean>(false);
   const { onSelectMenuItem } = useDirectory();
   const { colorMode } = useColorMode();
   const bg = useColorModeValue("white", "blackAlpha.800");
+  const [userInfoLocal, setUserInfoLocal] = useState<User | null>();
+  const { accessToken, setUserInfo } = useUser();
 
   const getUserData = async () => {
-    if (user) {
+    if (accessToken) {
       try {
-        const docRef = doc(firestore, "redditUser", user?.uid);
-        const docSnap = await getDoc(docRef);
-
-        if (docSnap.exists()) {
-          console.log("User Already Created");
-          setUserCreate(false);
-        } else {
-          setUserCreate(true);
+        const response = await axios.get(
+          `${process.env.NEXT_PUBLIC_API_BASE_URL}/users/profile`,
+          {
+            headers: {
+              Authorization: `Bearer ${accessToken}`,
+            },
+          }
+        );
+        const dataUser : User = {
+          user_id: response.data.id,
+          email: response.data.email,
+          is_admin: response.data.is_admin,
+          profile: {
+            profile_id: response.data.profile_id,
+            full_name: response.data.user_id,
+            avatar: response.data.avatar,
+            gender: response.data.gender
+          }
         }
+        setUserInfoLocal(dataUser);
+        setUserInfo(dataUser);
       } catch (error) {
         console.log(error);
       }
     } else return;
   };
 
-  const userCreate = async (session: any) => {
-    const document: RedditUserDocument = {
-      userId: user?.uid,
-      userName: user?.displayName || "",
-      userEmail: user?.email?.toString(),
-      userImage: user?.photoURL || "",
-      redditImage: redditUserImage,
-      timestamp: serverTimestamp() as Timestamp,
-    };
-    const userDocRef = doc(firestore, "redditUser", session?.uid);
-    await setDoc(userDocRef, document);
-  };
-
   useEffect(() => {
     getUserData();
+  }, [accessToken]);
 
-    setRedditUserImage(
-      redditProfileImage[Math.floor(Math.random() * redditProfileImage.length)]
-    );
-
-    if (userCreates) {
-      userCreate(user);
-    } else return;
-  }, [user, firestore, userCreates]);
+  useEffect(() => {
+    if(!accessToken) {
+      setUserInfoLocal(null);
+    }
+  }, [accessToken]);
 
   return (
     <Flex
@@ -102,9 +95,9 @@ const Navbar: React.FC = () => {
           display={{ base: "none", md: "unset" }}
         />
       </Flex>
-      {user && <Directory />}
-      <SearchInput user={user} />
-      <RightContent user={user} />
+      {userInfoLocal && <Directory />}
+      <SearchInput user={userInfoLocal} />
+      <RightContent user={userInfoLocal} />
     </Flex>
   );
 };

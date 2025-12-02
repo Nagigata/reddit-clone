@@ -17,6 +17,7 @@
     "@fontsource/raleway": "^4.5.10",
     "@types/crypto-js": "^4.1.1",
     "@types/safe-json-stringify": "^1.1.2",
+    "axios": "^1.12.2",
     "crypto-js": "^4.1.1",
     "firebase": "^9.9.3",
     "firebase-functions": "^3.22.0",

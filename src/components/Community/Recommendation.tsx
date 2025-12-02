@@ -9,48 +9,41 @@ import {
   Stack,
   Text,
   useColorModeValue,
+  useToast,
 } from "@chakra-ui/react";
-import { collection, getDocs, orderBy, query } from "firebase/firestore";
 import Link from "next/link";
 import React, { useEffect, useState } from "react";
 import { FaReddit } from "react-icons/fa";
+import { HiLockClosed } from "react-icons/hi";
+import { useRouter } from "next/router";
+import { useSetRecoilState } from "recoil";
+import axios from "axios";
 
-import { Community } from "../../atoms/CommunitiesAtom";
-import { firestore } from "../../firebase/clientApp";
+import { Community, CommunityState } from "../../atoms/CommunitiesAtom";
 import useCommunityData from "../../hooks/useCommunityData";
 
 const Recommendation: React.FC = () => {
+  const router = useRouter();
   const [communities, setCommunities] = useState<Community[]>([]);
   const [isViewAll, setIsViewAll] = useState<boolean>(false);
   const [loading, setLoading] = useState(false);
-  const { communityStateValue, onJoinOrCommunity } = useCommunityData();
+  const { communityStateValue } = useCommunityData();
+  const setCommunityStateValue = useSetRecoilState(CommunityState);
   const bg = useColorModeValue("white", "#1A202C");
   const borderColor = useColorModeValue("gray.300", "#2D3748");
+  const textColor = useColorModeValue("gray.500", "gray.400");
+  const toast = useToast();
 
   const getCommunityRecommendation = async () => {
     setLoading(true);
     try {
-      const communityQuery = query(
-        collection(firestore, "communities"),
-        orderBy("numberOfMembers", "desc")
-        //limit(5)
-      );
-      const communityDocs = await getDocs(communityQuery);
-
+      const res = await axios.get(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/community/top-community`);
+      const data = res.data as Community[];
+      console.log(">>> Check data: ", data);
       if (isViewAll) {
-        const communities = communityDocs.docs
-          .slice(0, communityDocs.docs.length)
-          .map((doc) => ({
-            id: doc.id,
-            ...doc.data(),
-          })) as Community[];
-        setCommunities(communities);
+        setCommunities(data);
       } else {
-        const communities = communityDocs.docs.slice(0, 5).map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        })) as Community[];
-        setCommunities(communities);
+        setCommunities(data.slice(0, 5));
       }
     } catch (error) {
       console.log("getCommunityRecommendation", error);
@@ -61,6 +54,65 @@ const Recommendation: React.FC = () => {
   useEffect(() => {
     getCommunityRecommendation();
   }, [isViewAll]);
+
+  const handleClickJoinCommunity = async (community: Community, e: React.MouseEvent) => {
+    e.stopPropagation();
+    
+    const isJoined = !!communityStateValue.mySnippets.find(
+      (snippet) => snippet.communityId === community.community_id
+    );
+    
+    if (isJoined) return;
+    
+    const status = community.type === 'Private' ? 'PENDING' : 'APPROVED';
+    
+    try {
+      await axios.post(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/community-member`, {
+        community_id: community.community_id,
+        user_id: 1,
+        role: 'member',
+        status: status
+      });
+
+      setCommunityStateValue((prev) => ({
+        ...prev,
+        mySnippets: [
+          ...prev.mySnippets,
+          {
+            communityId: community.community_id,
+            isModerator: false,
+            imageURL: community.avatar || "",
+            statusCommunity: status,
+            communityName: community.name
+          },
+        ],
+      }));
+      
+      toast({
+        title: community.type === 'Private' ? "Request Sent" : "Joined!",
+        description: community.type === 'Private' 
+          ? "Your request is pending approval"
+          : `You've joined r/${community.name}`,
+        status: "success",
+        duration: 3000,
+        isClosable: true,
+      });
+    } catch(error: any) {
+      console.log(">>> error: ", error);
+      toast({
+        title: "Error",
+        description: "Unable to join. Please try again.",
+        status: "error",
+        duration: 3000,
+        isClosable: true,
+      });
+    }
+  };
+
+  const handleClickNavigator = (isPending: boolean, name: string) => {
+    if (isPending) return;
+    router.push(`/r/${name}`);
+  };
 
   return (
     <Flex
@@ -106,10 +158,15 @@ const Recommendation: React.FC = () => {
           <>
             {communities.map((item, index) => {
               const isJoined = !!communityStateValue.mySnippets.find(
-                (snippet) => snippet.communityId === item.id
+                (snippet) => snippet.communityId === item.community_id
+              );
+              const isPending = !!communityStateValue.mySnippets.find(
+                (snippet) =>
+                  Number(snippet.communityId) === item?.community_id &&
+                  snippet.statusCommunity === 'PENDING'
               );
               return (
-                <Link key={item.id} href={`/r/${item.id}`}>
+                <Box key={item.community_id} onClick={() => handleClickNavigator(isPending, item.name)}>
                   <Flex
                     position="relative"
                     align="center"
@@ -124,11 +181,11 @@ const Recommendation: React.FC = () => {
                         <Text mr={2}>{index + 1}</Text>
                       </Flex>
                       <Flex align="center" width="80%">
-                        {item.imageURL ? (
+                        {item.avatar ? (
                           <Image
                             borderRadius="full"
                             boxSize="28px"
-                            src={item.imageURL}
+                            src={item.avatar}
                             mr={2}
                           />
                         ) : (
@@ -145,20 +202,25 @@ const Recommendation: React.FC = () => {
                             overflow: "hidden",
                             textOverflow: "ellipsis",
                           }}
-                        >{`r/${item.id}`}</span>
+                        >{`r/${item.name}`}</span>
+                        {item?.type === 'Private' && (
+                          <Icon marginLeft={2} as={HiLockClosed} color={textColor} mr={2} />
+                        )}
                       </Flex>
                     </Flex>
                     <Box position="absolute" right="10px">
                       <Button
                         height="22px"
                         fontSize="8pt"
-                        variant={isJoined ? "outline" : "solid"}
+                        variant={isPending ? "outline" : (isJoined ? "outline" : "solid")}
+                        onClick={(e) => handleClickJoinCommunity(item, e)}
+                        isDisabled={isJoined || isPending}
                       >
-                        {isJoined ? "Joined" : "Join"}
+                        {isPending ? "Pending" : (isJoined ? "Joined" : "Join")}
                       </Button>
                     </Box>
                   </Flex>
-                </Link>
+                </Box>
               );
             })}
             <Box p="10px 20px">
@@ -178,4 +240,5 @@ const Recommendation: React.FC = () => {
     </Flex>
   );
 };
+
 export default Recommendation;

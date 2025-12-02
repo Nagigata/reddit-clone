@@ -11,7 +11,6 @@ import {
   Text,
   useColorMode,
 } from "@chakra-ui/react";
-import { signOut, User } from "firebase/auth";
 import React from "react";
 import { CgProfile } from "react-icons/cg";
 import { FaRedditSquare } from "react-icons/fa";
@@ -23,6 +22,21 @@ import { IoSparkles } from "react-icons/io5";
 import { useSetRecoilState } from "recoil";
 import { authModelState } from "../../atoms/authModalAtom";
 import { auth } from "../../firebase/clientApp";
+import { useUser } from "../../context/userContext";
+
+interface UserProfile {
+  profile_id: number;
+  full_name: string;
+  avatar: string | null;
+  gender: string | null;
+}
+
+export interface User {
+  user_id: number;
+  email: string;
+  is_admin: boolean;
+  profile: UserProfile;
+}
 
 type UserMenuProps = {
   user?: User | null;
@@ -31,21 +45,22 @@ type UserMenuProps = {
 const UserMenu: React.FC<UserMenuProps> = ({ user }) => {
   const router = useRouter();
   const setAuthModalState = useSetRecoilState(authModelState);
+  const { signOut } = useUser();
   const { colorMode, toggleColorMode } = useColorMode();
 
   const handelNavigatePage = () => {
     if (user) {
       router.push({
-        pathname: `/profile/${user?.uid}`,
+        pathname: `/profile/${user?.user_id}`,
         query: {
-          uid: user?.uid.toString(),
+          uid: user?.user_id.toString(),
         },
       });
     }
   };
 
   const logout = async () => {
-    await signOut(auth);
+    signOut();
   };
 
   return (
@@ -74,7 +89,7 @@ const UserMenu: React.FC<UserMenuProps> = ({ user }) => {
                   mr={8}
                 >
                   <Text fontWeight={700}>
-                    {user?.displayName || user?.email?.split("@")[0]}
+                    {user?.profile.full_name || user?.email?.split("@")[0]}
                   </Text>
                   <Flex alignItems="center">
                     <Icon as={IoSparkles} color="brand.100" mr={1} />

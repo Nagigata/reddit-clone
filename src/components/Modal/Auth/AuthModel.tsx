@@ -19,11 +19,13 @@ import { auth } from "../../../firebase/clientApp";
 import AuthInput from "./AuthInput";
 import OAuthButtons from "./OAuthButtons";
 import ResetPassword from "./ResetPassword";
+import { useUser } from "../../../context/userContext";
 
 const AuthModel: React.FC = () => {
   //const { isOpen, onOpen, onClose } = useDisclosure();
   const [modelState, setModelState] = useRecoilState(authModelState);
-  const [user, loading, error] = useAuthState(auth);
+  const { accessToken } = useUser();
+  // console.log(">>> access in auth model: ", accessToken)
 
   const handleClose = () => {
     setModelState((prev) => ({
@@ -33,9 +35,11 @@ const AuthModel: React.FC = () => {
   };
 
   useEffect(() => {
-    if (user) handleClose();
-    //console.log(user, "🔥🔥");
-  }, [user]);
+    if (accessToken) {
+      console.log(">>> access in auth model: ", accessToken)
+      handleClose();
+    }
+  }, [accessToken]);
 
   return (
     <>
@@ -63,10 +67,10 @@ const AuthModel: React.FC = () => {
             >
               {modelState.view === "login" || modelState.view === "signup" ? (
                 <>
-                  <OAuthButtons />
+                  {/* <OAuthButtons />
                   <Text color="gray.500" fontWeight={700}>
                     OR
-                  </Text>
+                  </Text> */}
                   <AuthInput />
                 </>
               ) : (

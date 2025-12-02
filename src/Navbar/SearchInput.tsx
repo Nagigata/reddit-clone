@@ -4,11 +4,23 @@ import {
   Input,
   InputGroup,
   InputLeftElement,
-  InputRightElement,
   useColorModeValue,
 } from "@chakra-ui/react";
 import { SearchIcon } from "@chakra-ui/icons";
-import { User } from "firebase/auth";
+
+interface UserProfile {
+  profile_id: number;
+  full_name: string;
+  avatar: string | null;
+  gender: string | null;
+}
+
+export interface User {
+  user_id: number;
+  email: string;
+  is_admin: boolean;
+  profile: UserProfile;
+}
 
 type SearchInputProps = {
   user?: User | null;
