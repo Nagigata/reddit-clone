@@ -69,7 +69,8 @@ export interface CommentItem {
   content: string;
   parent_comment_id?: number | null;
   created_at?: string;
-   vote_count?: number;
+  vote_count?: number;
+  my_vote?: number; 
   author?: {
     id: number;
     email: string;

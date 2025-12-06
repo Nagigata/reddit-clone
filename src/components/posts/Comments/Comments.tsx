@@ -42,6 +42,7 @@ const Comments: React.FC<CommentsProps> = ({
   const bg = useColorModeValue("white", "#1A202C");
   const lineBorderColor = useColorModeValue("gray.100", "#171923");
   const bgAccessBox = useColorModeValue("gray.50", "#2D3748");
+  const replyBorderColor = useColorModeValue("gray.200", "gray.600");
   const { user } = useAuth();
   const { communityStateValue } = useCommunityData();
 
@@ -92,7 +93,7 @@ const Comments: React.FC<CommentsProps> = ({
         text: created.content,
         createdAt: created.created_at,
         voteStatus: created.vote_count ?? 0,
-        userVoteValue: 0,
+        userVoteValue: created.my_vote ?? 0,
       };
 
       setCommentText("");
@@ -149,7 +150,7 @@ const Comments: React.FC<CommentsProps> = ({
         text: c.content,
         createdAt: c.created_at,
         voteStatus: c.vote_count ?? 0,
-        userVoteValue: 0,
+        userVoteValue: c.my_vote ?? 0, // Use my_vote from API response
       }));
 
       setComments(mapped);
@@ -176,7 +177,7 @@ const Comments: React.FC<CommentsProps> = ({
               text: r.content,
               createdAt: r.created_at,
               voteStatus: r.vote_count ?? 0,
-              userVoteValue: 0,
+              userVoteValue: r.my_vote ?? 0, // Use my_vote from API response
             }));
             return [comment.id as string, mappedReplies] as const;
           } catch {
@@ -190,56 +191,6 @@ const Comments: React.FC<CommentsProps> = ({
         if (id) next[id] = list;
       });
       setRepliesByParent(next);
-
-      // Load my votes for all comments & replies
-      if (user) {
-        const allComments: Comment[] = [
-          ...mapped,
-          ...Object.values(next).flat(),
-        ];
-        const voteMap: Record<string, number> = {};
-        for (const c of allComments) {
-          if (!c.id) continue;
-          try {
-            const vote = await postService.getMyVote({
-              comment_id: Number(c.id),
-            });
-            if (vote) {
-              let value = 0;
-              if (typeof vote.vote_type === "number") {
-                value = vote.vote_type as number;
-              } else if (typeof vote.vote_type === "string") {
-                value =
-                  vote.vote_type === "up"
-                    ? 1
-                    : vote.vote_type === "down"
-                    ? -1
-                    : 0;
-              }
-              voteMap[c.id] = value;
-            }
-          } catch {
-            // ignore single comment error
-          }
-        }
-
-        setComments((prev) =>
-          prev.map((c) => ({
-            ...c,
-            userVoteValue: c.id ? voteMap[c.id] ?? 0 : 0,
-          }))
-        );
-        setRepliesByParent((prev) => {
-          const updated: Record<string, Comment[]> = {};
-          Object.entries(prev).forEach(([k, list]) => {
-            updated[k] = list.map((c) => ({
-              ...c,
-              userVoteValue: c.id ? voteMap[c.id] ?? 0 : 0,
-            }));
-          });
-          return updated;
-        });
-      }
     } catch (error) {
       console.log("GetPostComments Error", error);
     }
@@ -252,44 +203,53 @@ const Comments: React.FC<CommentsProps> = ({
   }, [selectedPost]);
 
   const handleVoteComment = async (comment: Comment, value: number) => {
-    if (!user || !comment.id) return;
+    if (!user || !comment.id || !selectedPost) return;
     try {
       const commentIdNum = Number(comment.id);
-      if (isNaN(commentIdNum)) return;
+      const postIdNum = Number(selectedPost.id);
+      if (isNaN(commentIdNum) || isNaN(postIdNum)) return;
 
       const prevUserVote = comment.userVoteValue ?? 0;
+      
+      // If clicking the same vote, unvote (set to 0)
+      let newVoteValue = value;
       if (prevUserVote === value) {
-        // Không cho unvote để tránh phức tạp với backend, chỉ cho đổi chiều
-        return;
+        newVoteValue = 0;
       }
 
+      // Calculate delta for vote count
       let delta = 0;
-      if (prevUserVote === 0) {
-        delta = value;
-      } else if (prevUserVote === 1 && value === -1) {
-        delta = -2;
-      } else if (prevUserVote === -1 && value === 1) {
-        delta = 2;
+      if (prevUserVote === 0 && newVoteValue !== 0) {
+        // New vote
+        delta = newVoteValue;
+      } else if (prevUserVote !== 0 && newVoteValue === 0) {
+        // Unvote
+        delta = -prevUserVote;
+      } else if (prevUserVote !== 0 && newVoteValue !== 0) {
+        // Change vote direction
+        delta = newVoteValue - prevUserVote;
       }
 
+      // Call API with post_id and comment_id
       await postService.upsertVote({
+        post_id: postIdNum,
         comment_id: commentIdNum,
-        vote_type: value,
+        vote_type: newVoteValue,
       });
 
-      // Update state cho comment gốc
+      // Update state for main comments
       setComments((prev) =>
         prev.map((c) =>
           c.id === comment.id
             ? {
                 ...c,
                 voteStatus: (c.voteStatus ?? 0) + delta,
-                userVoteValue: value,
+                userVoteValue: newVoteValue,
               }
             : c
         )
       );
-      // Và cho replies
+      // Update state for replies
       setRepliesByParent((prev) => {
         const updated: Record<string, Comment[]> = {};
         Object.entries(prev).forEach(([k, list]) => {
@@ -298,7 +258,7 @@ const Comments: React.FC<CommentsProps> = ({
               ? {
                   ...c,
                   voteStatus: (c.voteStatus ?? 0) + delta,
-                  userVoteValue: value,
+                  userVoteValue: newVoteValue,
                 }
               : c
           );
@@ -352,7 +312,7 @@ const Comments: React.FC<CommentsProps> = ({
         text: created.content,
         createdAt: created.created_at,
         voteStatus: created.vote_count ?? 0,
-        userVoteValue: 0,
+        userVoteValue: created.my_vote ?? 0,
       };
 
       setRepliesByParent((prev) => ({
@@ -430,11 +390,11 @@ const Comments: React.FC<CommentsProps> = ({
           </>
         )}
       </Flex>
-      <Stack spacing={6} p={2}>
+      <Stack spacing={4} p={4}>
         {fetchLoading ? (
           <>
             {[0, 1, 2].map((item) => (
-              <Box key={item} padding="6" bg={bg}>
+              <Box key={item} padding="6" bg={bg} borderRadius={8}>
                 <SkeletonCircle size="10" />
                 <SkeletonText mt="4" noOfLines={2} spacing="4" />
               </Box>
@@ -451,14 +411,17 @@ const Comments: React.FC<CommentsProps> = ({
                 borderColor={lineBorderColor}
                 p={20}
               >
-                <Text fontWeight={700} opacity={0.3}>
+                <Text fontWeight={700} opacity={0.3} fontSize="12pt">
                   No Comments Yet
+                </Text>
+                <Text fontSize="10pt" opacity={0.2} mt={2}>
+                  Be the first to comment!
                 </Text>
               </Flex>
             ) : (
               <>
                 {comments.map((comment) => (
-                  <Box key={comment.id} mb={2}>
+                  <Box key={comment.id}>
                     <CommentItem
                       comment={comment}
                       onDeleteComment={onDeleteComment}
@@ -468,13 +431,13 @@ const Comments: React.FC<CommentsProps> = ({
                       onReply={handleReply}
                     />
                     {activeReplyParentId === comment.id && !!user && (
-                      <Box pl={10} mt={2}>
+                      <Box pl={12} mt={3} mb={2}>
                         {requiresMembership && !hasAccess ? (
                           <Box
                             p={3}
                             textAlign="center"
                             bg={bgAccessBox}
-                            borderRadius={4}
+                            borderRadius={6}
                             border="1px solid"
                             borderColor={lineBorderColor}
                           >
@@ -500,18 +463,26 @@ const Comments: React.FC<CommentsProps> = ({
                     )}
                     {repliesByParent[comment.id!] &&
                       repliesByParent[comment.id!].length > 0 && (
-                        <Stack pl={10} mt={2} spacing={4}>
-                          {repliesByParent[comment.id!].map((reply) => (
-                            <CommentItem
-                              key={reply.id}
-                              comment={reply}
-                              onDeleteComment={onDeleteComment}
-                              isLoading={false}
-                              userId={user ? String(user.id) : undefined}
-                              onVote={handleVoteComment}
-                            />
-                          ))}
-                        </Stack>
+                        <Box 
+                          pl={12} 
+                          mt={2} 
+                          borderLeft="2px solid"
+                          borderColor={replyBorderColor}
+                          ml={2}
+                        >
+                          <Stack spacing={2}>
+                            {repliesByParent[comment.id!].map((reply) => (
+                              <CommentItem
+                                key={reply.id}
+                                comment={reply}
+                                onDeleteComment={onDeleteComment}
+                                isLoading={false}
+                                userId={user ? String(user.id) : undefined}
+                                onVote={handleVoteComment}
+                              />
+                            ))}
+                          </Stack>
+                        </Box>
                       )}
                   </Box>
                 ))}
