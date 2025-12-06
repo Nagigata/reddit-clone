@@ -11,17 +11,26 @@ import {
   Avatar,
   Spinner,
   IconButton,
+  Badge,
+  Divider,
+  Stack,
 } from "@chakra-ui/react";
 import { motion, AnimatePresence } from "framer-motion";
 import React, { useState, useRef, useEffect } from "react";
 import { BsChatDotsFill, BsX, BsSend, BsRobot } from "react-icons/bs";
 import { IoSparkles } from "react-icons/io5";
+import { factCheckService } from "../../services/factCheckService";
 
 export type Message = {
   id: string;
   role: "user" | "assistant";
   content: string;
   timestamp: Date;
+  factCheckResults?: Array<{
+    claim: string;
+    verdict: string;
+    explanation: string;
+  }>;
 };
 
 type AIChatWidgetProps = {
@@ -41,7 +50,7 @@ const AIChatWidget: React.FC<AIChatWidgetProps> = ({
           {
             id: "1",
             role: "assistant",
-            content: "Hello! I'm your AI assistant. How can I help you today?",
+            content: "Hello! I'm your AI fact-checking assistant. Send me a claim or statement, and I'll help verify it for you!",
             timestamp: new Date(),
           },
         ]
@@ -84,62 +93,57 @@ const AIChatWidget: React.FC<AIChatWidgetProps> = ({
       timestamp: new Date(),
     };
 
+    const claim = inputValue.trim();
     setMessages((prev) => [...prev, userMessage]);
     setInputValue("");
     setIsLoading(true);
 
-    // Simulate API call - replace with actual API call when ready
-    setTimeout(() => {
-      const assistantMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        role: "assistant",
-        content: apiEndpoint
-          ? "API response will appear here"
-          : "I understand your message. This is a demo response. Connect an API endpoint to get real AI responses!",
-        timestamp: new Date(),
-      };
-
-      setMessages((prev) => [...prev, assistantMessage]);
-      setIsLoading(false);
-    }, 1000);
-
-    // Uncomment and use this when you have an API endpoint:
-    /*
     try {
-      const response = await fetch(apiEndpoint, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          messages: [...messages, userMessage].map((msg) => ({
-            role: msg.role,
-            content: msg.content,
-          })),
-        }),
-      });
+      const results = await factCheckService.checkClaim(claim);
+      
+      if (results && results.length > 0) {
+        // Format the response nicely
+        let responseContent = "Fact-Check Results:\n\n";
+        
+        results.forEach((result, index) => {
+          responseContent += `Claim: ${result.claim}\n`;
+          responseContent += `Verdict: ${result.verdict}\n`;
+          responseContent += `Explanation: ${result.explanation}\n`;
+          if (index < results.length - 1) {
+            responseContent += "\n---\n\n";
+          }
+        });
 
-      const data = await response.json();
-      const assistantMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        role: "assistant",
-        content: data.response || data.message || "I'm sorry, I couldn't process that.",
-        timestamp: new Date(),
-      };
+        const assistantMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          role: "assistant",
+          content: responseContent,
+          timestamp: new Date(),
+          factCheckResults: results,
+        };
 
-      setMessages((prev) => [...prev, assistantMessage]);
+        setMessages((prev) => [...prev, assistantMessage]);
+      } else {
+        const assistantMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          role: "assistant",
+          content: "I couldn't find any fact-check results for that claim. Please try rephrasing your question.",
+          timestamp: new Date(),
+        };
+        setMessages((prev) => [...prev, assistantMessage]);
+      }
     } catch (error) {
+      console.error("Error checking fact:", error);
       const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: "assistant",
-        content: "Sorry, I encountered an error. Please try again.",
+        content: "Sorry, I encountered an error while checking the fact. Please try again later.",
         timestamp: new Date(),
       };
       setMessages((prev) => [...prev, errorMessage]);
     } finally {
       setIsLoading(false);
     }
-    */
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -289,9 +293,55 @@ const AIChatWidget: React.FC<AIChatWidgetProps> = ({
                         }
                         color={message.role === "user" ? "white" : textColor}
                       >
-                        <Text fontSize="sm" whiteSpace="pre-wrap">
-                          {message.content}
-                        </Text>
+                        {message.factCheckResults && message.factCheckResults.length > 0 ? (
+                          <Stack spacing={3}>
+                            <Text fontSize="sm" fontWeight="bold" mb={2}>
+                              Fact-Check Results:
+                            </Text>
+                            {message.factCheckResults.map((result, index) => (
+                              <Box key={index}>
+                                <VStack align="stretch" spacing={2}>
+                                  <Box>
+                                    <Text fontSize="xs" fontWeight="semibold" mb={1} opacity={0.8}>
+                                      Claim:
+                                    </Text>
+                                    <Text fontSize="sm">{result.claim}</Text>
+                                  </Box>
+                                  <Box>
+                                    <Text fontSize="xs" fontWeight="semibold" mb={1} opacity={0.8}>
+                                      Verdict:
+                                    </Text>
+                                    <Badge
+                                      colorScheme={
+                                        result.verdict === "TRUE" || result.verdict === "true"
+                                          ? "green"
+                                          : result.verdict === "FALSE" || result.verdict === "false"
+                                          ? "red"
+                                          : "yellow"
+                                      }
+                                      fontSize="xs"
+                                    >
+                                      {result.verdict}
+                                    </Badge>
+                                  </Box>
+                                  <Box>
+                                    <Text fontSize="xs" fontWeight="semibold" mb={1} opacity={0.8}>
+                                      Explanation:
+                                    </Text>
+                                    <Text fontSize="sm">{result.explanation}</Text>
+                                  </Box>
+                                </VStack>
+                                {index < message.factCheckResults!.length - 1 && (
+                                  <Divider my={3} />
+                                )}
+                              </Box>
+                            ))}
+                          </Stack>
+                        ) : (
+                          <Text fontSize="sm" whiteSpace="pre-wrap">
+                            {message.content}
+                          </Text>
+                        )}
                       </Box>
                     </Flex>
                   </motion.div>
