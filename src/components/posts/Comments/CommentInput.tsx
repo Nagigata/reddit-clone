@@ -5,22 +5,23 @@ import {
   Text,
   useColorModeValue,
 } from "@chakra-ui/react";
-import { User } from "firebase/auth";
 import React from "react";
 import AuthButtons from "../../../Navbar/RightContent/AuthButtons";
 
 type CommentInputProps = {
   commentText: string;
   setCommentText: (value: string) => void;
-  user: User;
+  isAuthenticated: boolean;
+  displayName?: string;
   createLoading: boolean;
-  onCreateComments: (commentText: string) => void;
+  onCreateComments: () => void;
 };
 
 const CommentInput: React.FC<CommentInputProps> = ({
   commentText,
   setCommentText,
-  user,
+  isAuthenticated,
+  displayName,
   createLoading,
   onCreateComments,
 }) => {
@@ -28,12 +29,12 @@ const CommentInput: React.FC<CommentInputProps> = ({
   const bgBottom = useColorModeValue("gray.100", "#1A202C");
   return (
     <Flex direction="column" position="relative">
-      {user ? (
+      {isAuthenticated ? (
         <>
           <Text mb={1}>
             Comment as{" "}
             <span style={{ color: "#3182CE" }}>
-              {user?.email?.split("@")[0]}
+              {displayName}
             </span>
           </Text>
           <Textarea
@@ -65,7 +66,7 @@ const CommentInput: React.FC<CommentInputProps> = ({
               height="26px"
               disabled={!commentText.length}
               isLoading={createLoading}
-              onClick={() => onCreateComments(commentText)}
+              onClick={onCreateComments}
             >
               Comment
             </Button>

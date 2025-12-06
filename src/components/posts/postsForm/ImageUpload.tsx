@@ -12,6 +12,9 @@ type ImageUploadProps = {
   onSelectedImage: (event: React.ChangeEvent<HTMLInputElement>) => void;
   setSelectTab: (value: string) => void;
   setSelectedFile: (value: string) => void;
+  handleCreatePost?: () => void;
+  loading?: boolean;
+  title?: string;
 };
 
 const ImageUpload: React.FC<ImageUploadProps> = ({
@@ -19,6 +22,9 @@ const ImageUpload: React.FC<ImageUploadProps> = ({
   onSelectedImage,
   setSelectTab,
   setSelectedFile,
+  handleCreatePost,
+  loading,
+  title,
 }) => {
   const selectedFileRef = useRef<HTMLInputElement>(null);
   const searchBorder = useColorModeValue("gray.200", "#718096");
@@ -28,7 +34,7 @@ const ImageUpload: React.FC<ImageUploadProps> = ({
       {selectedFile ? (
         <>
           <Image src={selectedFile} maxWidth="400px" maxHeight="400px" />
-          <Stack direction="row" mt={4}>
+          <Stack direction="row" mt={4} spacing={2}>
             <Button height="28px" onClick={() => setSelectTab("Post")}>
               Back to Post
             </Button>
@@ -39,6 +45,16 @@ const ImageUpload: React.FC<ImageUploadProps> = ({
             >
               Remove
             </Button>
+            {handleCreatePost && (
+              <Button
+                height="28px"
+                onClick={handleCreatePost}
+                isLoading={loading}
+                disabled={!title}
+              >
+                Post
+              </Button>
+            )}
           </Stack>
         </>
       ) : (

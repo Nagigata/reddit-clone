@@ -1,20 +1,21 @@
-import { Flex, Icon, Input, useColorModeValue } from "@chakra-ui/react";
+import { Flex, Icon, Input, Text, Tooltip, useColorModeValue } from "@chakra-ui/react";
 import { useRouter } from "next/router";
 import React from "react";
-import { useAuthState } from "react-firebase-hooks/auth";
 import { BsLink45Deg } from "react-icons/bs";
 import { FaReddit } from "react-icons/fa";
 import { IoImageOutline } from "react-icons/io5";
 import { useSetRecoilState } from "recoil";
 
 import { authModelState } from "../../atoms/authModalAtom";
-import { auth } from "../../firebase/clientApp";
+import { useAuth } from "../../contexts/AuthContext";
 import useDirectory from "../../hooks/useDirectory";
+import useCommunityData from "../../hooks/useCommunityData";
 
 const CreatePostLink: React.FC = () => {
   const router = useRouter();
-  const [user] = useAuthState(auth);
+  const { user } = useAuth();
   const { toggleMenuOpen } = useDirectory();
+  const { communityStateValue } = useCommunityData();
   const setAuthModelState = useSetRecoilState(authModelState);
   const bg = useColorModeValue("white", "#1A202C");
   const borderColor = useColorModeValue("gray.300", "#2D3748");
@@ -23,9 +24,33 @@ const CreatePostLink: React.FC = () => {
   const hoverBorderColor = useColorModeValue("blue.300", "blue.600");
   const iconColor = useColorModeValue("gray.400", "gray.500");
 
+  const currentCommunity = communityStateValue.currentCommunity;
+  
+  // Check if user is a member (status APPROVED)
+  const isMember = !!communityStateValue.mySnippets.find(
+    (snippet) => snippet.communityId === currentCommunity?.id
+  );
+  const isCreator = user && currentCommunity && String(user.id) === currentCommunity.creatorId;
+  const hasAccess = isMember || isCreator;
+
+  // Private or Restricted: only members can create posts
+  const isPrivate = currentCommunity?.typeId === 1;
+  const isRestricted = currentCommunity?.typeId === 3;
+  const requiresMembership = isPrivate || isRestricted;
+  const canCreatePost = !requiresMembership || hasAccess;
+
   const onClick = () => {
     if (!user) {
       setAuthModelState({ open: true, view: "login" });
+      return;
+    }
+
+    // Check access for private/restricted communities
+    if (requiresMembership && !hasAccess) {
+      // Navigate to community page to show join button
+      if (currentCommunity) {
+        router.push(`/r/${currentCommunity.id}`);
+      }
       return;
     }
 
@@ -37,16 +62,17 @@ const CreatePostLink: React.FC = () => {
     }
 
     toggleMenuOpen();
-
-    /*
-    if (community) {
-      router.push(`/r/${router.query.community}/submit`);
-      return;
-    }
-    */
   };
 
+  const isDisabled = requiresMembership && !hasAccess;
+  const tooltipText = isDisabled
+    ? isPrivate
+      ? "You must be a member to create posts"
+      : "You must join this community to create posts"
+    : "";
+
   return (
+    <Tooltip label={tooltipText} isDisabled={!isDisabled}>
     <Flex
       justify="space-evenly"
       align="center"
@@ -59,11 +85,12 @@ const CreatePostLink: React.FC = () => {
       mb={4}
       boxShadow="0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)"
       _hover={{ 
-        boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)",
-        borderColor: hoverBorderColor
+          boxShadow: isDisabled ? undefined : "0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)",
+          borderColor: isDisabled ? undefined : hoverBorderColor
       }}
       transition="all 0.2s ease-in-out"
-      cursor="pointer"
+        cursor={isDisabled ? "not-allowed" : "pointer"}
+        opacity={isDisabled ? 0.6 : 1}
       onClick={onClick}
     >
       <Icon 
@@ -75,13 +102,13 @@ const CreatePostLink: React.FC = () => {
         transition="all 0.2s ease-in-out"
       />
       <Input
-        placeholder="Create Post"
+        placeholder={isDisabled ? "Join to create posts" : "Create Post"}
         fontSize="10pt"
         _placeholder={{ color: "gray.500" }}
         _hover={{
-          bg: bg,
-          border: "1px solid",
-          borderColor: "blue.500",
+          bg: isDisabled ? undefined : bg,
+          border: isDisabled ? undefined : "1px solid",
+          borderColor: isDisabled ? undefined : "blue.500",
         }}
         _focus={{
           outline: "none",
@@ -97,6 +124,7 @@ const CreatePostLink: React.FC = () => {
         mr={4}
         onClick={onClick}
         transition="all 0.2s ease-in-out"
+        isReadOnly={isDisabled}
       />
       <Icon
         as={IoImageOutline}
@@ -116,6 +144,7 @@ const CreatePostLink: React.FC = () => {
         transition="all 0.2s ease-in-out"
       />
     </Flex>
+    </Tooltip>
   );
 };
 export default CreatePostLink;

@@ -1,31 +1,36 @@
 import { Button, Flex, Input, Text, useColorModeValue } from "@chakra-ui/react";
 import React, { useState } from "react";
-import { useSignInWithEmailAndPassword } from "react-firebase-hooks/auth";
 import { useSetRecoilState } from "recoil";
 
 import { authModelState } from "../../../atoms/authModalAtom";
-import { auth } from "../../../firebase/clientApp";
-import { FIREBASE_ERRORS } from "../../../firebase/errors";
+import { useAuth } from "../../../contexts/AuthContext";
 
 type LoginProps = {};
 
 const Login: React.FC<LoginProps> = () => {
   const setAuthModelState = useSetRecoilState(authModelState);
+  const { login, loading, error } = useAuth();
   const [loginForm, setLoginForm] = useState({
     email: "",
     password: "",
   });
+  const [formError, setFormError] = useState("");
   const searchBorder = useColorModeValue("blue.500", "#4A5568");
   const inputBg = useColorModeValue("gray.50", "#4A5568");
   const focusedInputBg = useColorModeValue("white", "#2D3748");
   const placeholderColor = useColorModeValue("gray.500", "#CBD5E0");
 
-  const [signInWithEmailAndPassword, user, loading, error] =
-    useSignInWithEmailAndPassword(auth);
-
-  const onSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+  const onSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    signInWithEmailAndPassword(loginForm.email, loginForm.password);
+    setFormError("");
+    
+    try {
+      await login(loginForm.email, loginForm.password);
+      // Close modal on success (handled by AuthModel when user is set)
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : "Login failed";
+      setFormError(errorMessage);
+    }
   };
 
   const onChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -82,9 +87,11 @@ const Login: React.FC<LoginProps> = () => {
         }}
         bg={inputBg}
       />
+      {(formError || error) && (
       <Text textAlign="center" color="red" fontSize="10pt">
-        {FIREBASE_ERRORS[error?.message as keyof typeof FIREBASE_ERRORS]}
+          {formError || error?.message || "An error occurred"}
       </Text>
+      )}
       <Button
         width="100%"
         height="36px"

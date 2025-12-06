@@ -1,6 +1,6 @@
 import { io, Socket } from 'socket.io-client';
 
-const NOTIFICATION_API_BASE_URL = process.env.NEXT_PUBLIC_NOTIFICATION_API_URL;
+const NOTIFICATION_WS_URL = process.env.NEXT_PUBLIC_NOTIFICATION_WS_URL;
 
 class SocketService {
   private socket: Socket | null = null;
@@ -12,30 +12,33 @@ class SocketService {
       return;
     }
 
-    this.socket = io(NOTIFICATION_API_BASE_URL, {
+    this.socket = io(NOTIFICATION_WS_URL, {
       auth: {
         userId: userId
       },
-      transports: ['websocket', 'polling']
+      transports: ['websocket', 'polling'],
+      reconnection: true,
+      reconnectionAttempts: 5,
+      reconnectionDelay: 1000,
     });
 
     this.socket.on('connect', () => {
-      console.log('✅ Socket connected:', this.socket?.id);
+      console.log('Socket connected:', this.socket?.id);
       this.isConnected = true;
     });
 
     this.socket.on('disconnect', () => {
-      console.log('❌ Socket disconnected');
+      console.log('Socket disconnected');
       this.isConnected = false;
     });
 
     this.socket.on('connect_error', (error) => {
-      console.error('❌ Socket connection error:', error);
+      console.error('Socket connection error:', error);
       this.isConnected = false;
     });
 
     this.socket.on('reconnect', (attemptNumber) => {
-      console.log('🔄 Socket reconnected after', attemptNumber, 'attempts');
+      console.log('Socket reconnected after', attemptNumber, 'attempts');
       this.isConnected = true;
     });
 
@@ -45,7 +48,7 @@ class SocketService {
 
     // Listen for room join confirmation
     this.socket.on('joined-room', (data) => {
-      console.log('✅ Joined room confirmed:', data);
+      console.log('Joined room confirmed:', data);
     });
 
     // Listen for errors
@@ -59,7 +62,7 @@ class SocketService {
       this.socket.disconnect();
       this.socket = null;
       this.isConnected = false;
-      console.log('🔌 Socket disconnected');
+      console.log('Socket disconnected');
     }
   }
 
@@ -71,7 +74,7 @@ class SocketService {
     }
 
     this.socket.on('notification', (notification) => {
-      console.log('🔔 New notification received:', notification);
+      console.log('New notification received:', notification);
       callback(notification);
     });
   }
@@ -84,7 +87,7 @@ class SocketService {
     }
 
     this.socket.on('notification:updated', (data) => {
-      console.log('📝 Notification updated:', data);
+      console.log('Notification updated:', data);
       callback(data.notificationId, data.updates);
     });
   }
@@ -97,7 +100,7 @@ class SocketService {
     }
 
     this.socket.on('notification:deleted', (notificationId) => {
-      console.log('🗑️ Notification deleted:', notificationId);
+      console.log('Notification deleted:', notificationId);
       callback(notificationId);
     });
   }
@@ -110,7 +113,7 @@ class SocketService {
     }
 
     this.socket.emit('join-user-room', userId);
-    console.log('🏠 Joined user room:', userId);
+    console.log('Joined user room:', userId);
   }
 
   // Leave user-specific room
@@ -121,7 +124,7 @@ class SocketService {
     }
 
     this.socket.emit('leave-user-room', userId);
-    console.log('🚪 Left user room:', userId);
+    console.log('Left user room:', userId);
   }
 
   // Get connection status

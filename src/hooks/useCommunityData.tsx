@@ -1,16 +1,5 @@
-import {
-  collection,
-  doc,
-  getDoc,
-  getDocs,
-  increment,
-  serverTimestamp,
-  Timestamp,
-  writeBatch,
-} from "firebase/firestore";
 import { useRouter } from "next/router";
-import { useEffect, useState } from "react";
-import { useAuthState } from "react-firebase-hooks/auth";
+import { useCallback, useEffect, useState } from "react";
 import { useRecoilState, useSetRecoilState } from "recoil";
 import { authModelState } from "../atoms/authModalAtom";
 import {
@@ -18,10 +7,41 @@ import {
   CommunitySnippet,
   CommunityState,
 } from "../atoms/CommunitiesAtom";
-import { auth, firestore } from "../firebase/clientApp";
+import { useAuth } from "../contexts/AuthContext";
+import {
+  CommunityDto,
+  communityService,
+} from "../services/communityService";
+
+const mapDtoToCommunity = (dto: CommunityDto): Community => {
+  const backendId = dto.community_id ?? dto.id;
+  const slug = backendId ? String(backendId) : "";
+
+  let typeId = dto.type_id ?? dto.communityType?.type_id;
+
+  const typeString = dto.type || dto.communityType?.type;
+  if (!typeId && typeString) {
+    const t = typeString.toLowerCase();
+    if (t === "private") typeId = 1;
+    else if (t === "public") typeId = 2;
+    else if (t === "restricted") typeId = 3;
+  }
+
+  return {
+    id: slug, 
+    backendId,
+    name: dto.name, 
+    creatorId: String(dto.created_by ?? ""),
+    numberOfMembers: dto.members ?? 0,
+    privacyType: "public",
+    createdAt: dto.created_at ? new Date(dto.created_at) : undefined,
+    imageURL: dto.avatar,
+    typeId,
+  };
+};
 
 const useCommunityData = () => {
-  const [user] = useAuthState(auth);
+  const { user } = useAuth();
   const router = useRouter();
   const setAuthModelState = useSetRecoilState(authModelState);
   const [communityStateValue, setCommunityStateValue] =
@@ -37,23 +57,47 @@ const useCommunityData = () => {
     }
 
     if (isJoined) {
-      leaveCommunity(communityData.id);
+      // Admin (creator) không được rời khỏi community
+      if (user && String(user.id) === communityData.creatorId) {
+        return;
+      }
+      leaveCommunity(communityData);
       return;
     }
     joinCommunity(communityData);
   };
 
-  const getMySnippets = async () => {
+  const getMySnippets = useCallback(async () => {
     setLoading(true);
     try {
-      const snippetDocs = await getDocs(
-        collection(firestore, `users/${user?.uid}/communitySnippets`)
-      );
-      const snippets = snippetDocs.docs.map((doc) => ({ ...doc.data() }));
+      if (!user) {
+        setCommunityStateValue((prev) => ({
+          ...prev,
+          mySnippets: [],
+          snippetsFetched: false,
+        }));
+        setLoading(false);
+        return;
+      }
+
+      const joined = await communityService.getJoinedCommunities(user.id);
+
+      const snippets: CommunitySnippet[] = joined.map((c) => {
+        const backendId = c.community_id ?? c.id;
+        // Use ID as the identifier for routing
+        const slug = backendId ? String(backendId) : "";
+        return {
+          communityId: slug,
+          backendId,
+          name: c.name, 
+          imageURL: c.avatar,
+          isModerator: c.created_by === user.id,
+        };
+      });
 
       setCommunityStateValue((prev) => ({
         ...prev,
-        mySnippets: snippets as CommunitySnippet[],
+        mySnippets: snippets,
         snippetsFetched: true,
       }));
 
@@ -63,36 +107,26 @@ const useCommunityData = () => {
       setError(error.message);
     }
     setLoading(false);
-  };
+  }, [user, setCommunityStateValue]);
 
-  const getCommunityData = async (communityId: string) => {
+  const getCommunityData = useCallback(async (communityId: string) => {
     try {
-      const communityDocRef = doc(firestore, "communities", communityId);
-      const communityDoc = await getDoc(communityDocRef);
+      const dto = await communityService.getCommunityById(communityId);
+
+      const community = mapDtoToCommunity(dto);
 
       setCommunityStateValue((prev) => ({
         ...prev,
-        currentCommunity: {
-          id: communityDoc.id,
-          ...communityDoc.data(),
-        } as Community,
+        currentCommunity: community,
       }));
     } catch (error) {
       console.log(error);
     }
-  };
+  }, [setCommunityStateValue]);
 
   useEffect(() => {
-    if (!user) {
-      setCommunityStateValue((prev) => ({
-        ...prev,
-        mySnippets: [],
-        snippetsFetched: false,
-      }));
-      return;
-    }
     getMySnippets();
-  }, [user]);
+  }, [getMySnippets]);
 
   useEffect(() => {
     const { communityId } = router.query;
@@ -100,40 +134,57 @@ const useCommunityData = () => {
     if (communityId && !communityStateValue.currentCommunity) {
       getCommunityData(communityId as string);
     }
-  }, [router.query, communityStateValue.currentCommunity]);
+  }, [
+    router.query,
+    communityStateValue.currentCommunity,
+    getCommunityData,
+  ]);
 
   const joinCommunity = async (communityData: Community) => {
+    setLoading(true);
     try {
-      const batch = writeBatch(firestore);
+      if (!user) return;
 
-      const newSnippet: CommunitySnippet = {
-        communityId: communityData.id,
-        imageURL: communityData.imageURL || "",
-        isModerator: user?.uid === communityData.creatorId,
-        updateTimeStamp: serverTimestamp() as Timestamp,
-      };
+      const communityIdNumber =
+        communityData.backendId ?? Number(communityData.id);
 
-      batch.set(
-        doc(
-          firestore,
-          `users/${user?.uid}/communitySnippets`,
-          communityData.id
-        ),
-        newSnippet
-      );
+      if (!communityIdNumber || Number.isNaN(communityIdNumber)) {
+        throw new Error("Missing community id");
+      }
 
-      batch.update(doc(firestore, "communities", communityData.id), {
-        numberOfMembers: increment(1),
+      // 
+      const typeId = communityData.typeId;
+      const isPublic = !typeId || typeId === 2;
+      const status = isPublic ? "APPROVED" : "PENDING";
+      await communityService.joinCommunity({
+        community_id: communityIdNumber,
+        user_id: user.id,
+        status,
       });
 
-      await batch.commit();
+      if (status === "APPROVED") {
+        const newSnippet: CommunitySnippet = {
+          communityId: communityData.id,
+          backendId: communityIdNumber,
+          name: communityData.name, 
+          imageURL: communityData.imageURL || "",
+          isModerator: String(user.id) === communityData.creatorId,
+        };
 
-      setCommunityStateValue((prev) => ({
-        ...prev,
-        mySnippets: [...prev.mySnippets, newSnippet],
-      }));
-
-      updateCommunitySnippet(communityData, user?.uid!);
+        setCommunityStateValue((prev) => ({
+          ...prev,
+          mySnippets: [...prev.mySnippets, newSnippet],
+        }));
+      } else {
+        setCommunityStateValue((prev) => ({
+          ...prev,
+          pendingCommunityIds: prev.pendingCommunityIds.includes(
+            communityData.id
+          )
+            ? prev.pendingCommunityIds
+            : [...prev.pendingCommunityIds, communityData.id],
+        }));
+      }
     } catch (error: any) {
       console.log("JoinCommunity Error", error);
       setError(error.message);
@@ -141,53 +192,27 @@ const useCommunityData = () => {
     setLoading(false);
   };
 
-  const updateCommunitySnippet = async (
-    communityData: Community,
-    userId: string
-  ) => {
-    if (!communityData && !userId) return;
-
+  const leaveCommunity = async (communityData: Community) => {
+    setLoading(true);
     try {
-      const batch = writeBatch(firestore);
+      if (!user) return;
 
-      const newSnippet = {
-        userId: userId,
-        userEmail: user?.email,
-      };
+      const communityIdNumber =
+        communityData.backendId ?? Number(communityData.id);
 
-      batch.set(
-        doc(
-          firestore,
-          `communities/${communityData.id}/userInCommunity/${userId}`
-        ),
-        newSnippet
-      );
+      if (!communityIdNumber || Number.isNaN(communityIdNumber)) {
+        throw new Error("Missing community id");
+      }
 
-      await batch.commit();
-    } catch (error: any) {
-      console.log("JoinCommunity Error", error);
-      setError(error.message);
-    }
-  };
-
-  const leaveCommunity = async (communityId: string) => {
-    try {
-      const batch = writeBatch(firestore);
-
-      batch.delete(
-        doc(firestore, `users/${user?.uid}/communitySnippets`, communityId)
-      );
-
-      batch.update(doc(firestore, "communities", communityId), {
-        numberOfMembers: increment(-1),
-      });
-
-      await batch.commit();
+      await communityService.rejectMember(communityIdNumber, user.id);
 
       setCommunityStateValue((prev) => ({
         ...prev,
         mySnippets: prev.mySnippets.filter(
-          (item) => item.communityId !== communityId
+          (item) => item.communityId !== communityData.id
+        ),
+        pendingCommunityIds: prev.pendingCommunityIds.filter(
+          (id) => id !== communityData.id
         ),
       }));
     } catch (error: any) {

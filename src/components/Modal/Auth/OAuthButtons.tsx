@@ -1,42 +1,37 @@
 import { Button, Flex, Image, Text, useColorModeValue } from "@chakra-ui/react";
-import { User } from "firebase/auth";
-import { collection, doc, setDoc } from "firebase/firestore";
-import React, { useEffect } from "react";
-import { useSignInWithGoogle } from "react-firebase-hooks/auth";
-import { auth, firestore } from "../../../firebase/clientApp";
+import React, { useState } from "react";
 
 const OAuthButtons: React.FC = () => {
-  const [signInWithGoogle, userCred, loading, error] =
-    useSignInWithGoogle(auth);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const hoverBg = useColorModeValue("gray.50", "#2A4365");
-  const createUserDocument = async (user: User) => {
-    const userDocRef = doc(firestore, "users", user.uid);
 
-    await setDoc(userDocRef, JSON.parse(JSON.stringify(user)));
+  const handleGoogleSignIn = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      // await userService.signInWithGoogle();
+      setError("OAuth sign in is not yet implemented");
+    } catch (err: any) {
+      setError(err.message || "Failed to sign in with Google");
+    } finally {
+      setLoading(false);
+    }
   };
 
-  useEffect(() => {
-    if (userCred) {
-      createUserDocument(userCred.user);
-    }
-  }, [userCred]);
-
   return (
-    <Flex direction="column" width="100%" mb={4}>
+    <Flex direction="column" width="100%" mb={2}>
       <Button
         variant="oauth"
         _hover={{ bg: hoverBg }}
         mb={2}
         isLoading={loading}
-        onClick={() => signInWithGoogle()}
+        onClick={handleGoogleSignIn}
+        isDisabled={true}
       >
-        <Image src="/images/googlelogo.png" height="20px" mr={4} />
+        <Image src="/images/googlelogo.png" height="20px" mr={4} alt="Google logo" />
         Continue with Google
       </Button>
-      <Button variant="oauth" _hover={{ bg: hoverBg }}>
-        Some Other Provider
-      </Button>
-      {error && <Text>{error.message}</Text>}
     </Flex>
   );
 };

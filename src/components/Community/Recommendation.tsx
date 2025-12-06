@@ -10,14 +10,13 @@ import {
   Text,
   useColorModeValue,
 } from "@chakra-ui/react";
-import { collection, getDocs, orderBy, query } from "firebase/firestore";
 import Link from "next/link";
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { FaReddit } from "react-icons/fa";
 
 import { Community } from "../../atoms/CommunitiesAtom";
-import { firestore } from "../../firebase/clientApp";
 import useCommunityData from "../../hooks/useCommunityData";
+import { communityService } from "../../services/communityService";
 
 const Recommendation: React.FC = () => {
   const [communities, setCommunities] = useState<Community[]>([]);
@@ -28,40 +27,40 @@ const Recommendation: React.FC = () => {
   const borderColor = useColorModeValue("gray.300", "#2D3748");
   const hoverBg = useColorModeValue("gray.50", "gray.700");
 
-  const getCommunityRecommendation = async () => {
+  const getCommunityRecommendation = useCallback(async () => {
     setLoading(true);
     try {
-      const communityQuery = query(
-        collection(firestore, "communities"),
-        orderBy("numberOfMembers", "desc")
-        //limit(5)
-      );
-      const communityDocs = await getDocs(communityQuery);
+      const data = await communityService.getTopCommunities();
+
+      const mapped: Community[] = data.map((c) => {
+        const backendId = c.community_id ?? c.id;
+        const slug = backendId ? String(backendId) : "";
+        return {
+          id: slug, 
+          backendId,
+          name: c.name, 
+          creatorId: String(c.created_by || ""),
+          numberOfMembers: c.members ?? 0,
+          privacyType: "public",
+          createdAt: undefined as any,
+          imageURL: c.avatar,
+        };
+      });
 
       if (isViewAll) {
-        const communities = communityDocs.docs
-          .slice(0, communityDocs.docs.length)
-          .map((doc) => ({
-            id: doc.id,
-            ...doc.data(),
-          })) as Community[];
-        setCommunities(communities);
+        setCommunities(mapped);
       } else {
-        const communities = communityDocs.docs.slice(0, 5).map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        })) as Community[];
-        setCommunities(communities);
+        setCommunities(mapped.slice(0, 5));
       }
     } catch (error) {
       console.log("getCommunityRecommendation", error);
     }
     setLoading(false);
-  };
+  }, [isViewAll]);
 
   useEffect(() => {
     getCommunityRecommendation();
-  }, [isViewAll]);
+  }, [getCommunityRecommendation]);
 
   return (
     <Flex
@@ -122,6 +121,8 @@ const Recommendation: React.FC = () => {
               const isJoined = !!communityStateValue.mySnippets.find(
                 (snippet) => snippet.communityId === item.id
               );
+              const isPending =
+                communityStateValue.pendingCommunityIds?.includes(item.id);
               return (
                 <Link key={item.id} href={`/r/${item.id}`}>
                   <Flex
@@ -145,6 +146,7 @@ const Recommendation: React.FC = () => {
                             borderRadius="full"
                             boxSize="28px"
                             src={item.imageURL}
+                            alt={`${item.id} avatar`}
                             mr={2}
                           />
                         ) : (
@@ -161,7 +163,7 @@ const Recommendation: React.FC = () => {
                             overflow: "hidden",
                             textOverflow: "ellipsis",
                           }}
-                        >{`r/${item.id}`}</span>
+                        >{`r/${item.name || item.id}`}</span>
                       </Flex>
                     </Flex>
                     <Box position="absolute" right="10px">
@@ -169,8 +171,9 @@ const Recommendation: React.FC = () => {
                         height="22px"
                         fontSize="8pt"
                         variant={isJoined ? "outline" : "solid"}
+                        isDisabled={isPending}
                       >
-                        {isJoined ? "Joined" : "Join"}
+                        {isPending ? "Pending" : isJoined ? "Joined" : "Join"}
                       </Button>
                     </Box>
                   </Flex>

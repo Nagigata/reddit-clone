@@ -1,4 +1,3 @@
-import { doc, getDoc } from "firebase/firestore";
 import { GetServerSidePropsContext } from "next";
 import Head from "next/head";
 import React, { useEffect } from "react";
@@ -13,7 +12,7 @@ import Header from "../../../components/Community/Header";
 import NotFound from "../../../components/Community/NotFound";
 import PageContent from "../../../components/Layout/PageContent";
 import Posts from "../../../components/posts/Posts";
-import { firestore } from "../../../firebase/clientApp";
+import { communityService } from "../../../services/communityService";
 
 type CommunityProps = {
   communityData: Community;
@@ -28,7 +27,7 @@ const CommunityPage: React.FC<CommunityProps> = ({ communityData }) => {
       ...prev,
       currentCommunity: communityData,
     }));
-  }, [communityData]);
+  }, [communityData, setCommunityStateValue]);
 
   if (!communityData) {
     return <NotFound />;
@@ -60,20 +59,49 @@ const CommunityPage: React.FC<CommunityProps> = ({ communityData }) => {
 };
 
 export async function getServerSideProps(context: GetServerSidePropsContext) {
-  // get data and pass
   try {
-    const communityDocRef = doc(
-      firestore,
-      "communities",
-      context.query.communityId as string
-    );
-    const communityDoc = await getDoc(communityDocRef);
+    const id = context.query.communityId as string;
+    const dto = await communityService
+      .getCommunityById(id)
+      .catch(() => null);
 
     return {
       props: {
-        communityData: communityDoc.exists()
+        communityData: dto
           ? JSON.parse(
-              safeJsonStringify({ id: communityDoc.id, ...communityDoc.data() })
+              safeJsonStringify((() => {
+                const backendId = dto.community_id ?? dto.id;
+                // Use ID as the identifier for routing
+                const slug = backendId ? String(backendId) : String(id);
+
+                let typeId = dto.type_id ?? dto.communityType?.type_id;
+
+                const typeString =
+                  (dto as any).type || dto.communityType?.type;
+                if (!typeId && typeString) {
+                  const t = typeString.toLowerCase();
+                  if (t === "private") typeId = 1;
+                  else if (t === "public") typeId = 2;
+                  else if (t === "restricted") typeId = 3;
+                }
+
+                return {
+                  id: slug,
+                  backendId,
+                  name: dto.name, 
+                  creatorId: String(dto.created_by || ""),
+                  numberOfMembers:
+                    typeof (dto as any).members === "number"
+                      ? (dto as any).members
+                      : 0,
+                  privacyType: "public",
+                  createdAt: dto.created_at
+                    ? new Date(dto.created_at)
+                    : undefined,
+                  imageURL: dto.avatar,
+                  typeId,
+                } as Community;
+              })())
             )
           : "",
       },

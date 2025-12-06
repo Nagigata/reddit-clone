@@ -11,16 +11,15 @@ import {
 } from '@chakra-ui/react';
 import { useRouter } from 'next/router';
 import { GetServerSideProps } from 'next';
-import { useAuthState } from 'react-firebase-hooks/auth';
 import { useEffect, useState } from 'react';
-import { auth } from '../firebase/clientApp';
+import { useAuth } from '../contexts/AuthContext';
 import { useNotifications } from '../hooks/useNotifications';
 
 
 type BooleanPreferenceKey = 'inApp' | 'email' | 'push';
 
 const NotificationsPage: React.FC = () => {
-  const [user, loadingUser] = useAuthState(auth);
+  const { user, loading: loadingUser } = useAuth();
   const router = useRouter();
   const toast = useToast();
   const { preferences, updatePreferences, loading } = useNotifications();

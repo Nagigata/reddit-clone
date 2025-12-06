@@ -1,9 +1,9 @@
-import { Timestamp } from "firebase/firestore";
 import { atom } from "recoil";
 
 export type Post = {
   id?: string;
   communityId: string;
+  communityName?: string; // Added for community name
   creatorId: string;
   creatorDisplayName: string;
   title: string;
@@ -12,7 +12,7 @@ export type Post = {
   voteStatus: number;
   imageURL?: string;
   communityImageURL?: string;
-  createdAt: Timestamp;
+  createdAt: Date | string | { seconds: number } | any; // Support multiple date formats
 };
 
 export type PostVote = {

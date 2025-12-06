@@ -1,42 +1,51 @@
 import { Button, Flex, Input, Text, useColorModeValue } from "@chakra-ui/react";
-import { User } from "firebase/auth";
-import { addDoc, collection } from "firebase/firestore";
-import React, { useEffect, useState } from "react";
-import { useCreateUserWithEmailAndPassword } from "react-firebase-hooks/auth";
+import React, { useState } from "react";
 import { useSetRecoilState } from "recoil";
 
 import { authModelState } from "../../../atoms/authModalAtom";
-import { auth, firestore } from "../../../firebase/clientApp";
-import { FIREBASE_ERRORS } from "../../../firebase/errors";
+import { useAuth } from "../../../contexts/AuthContext";
 
 const SignUp: React.FC = () => {
   const setAuthModelState = useSetRecoilState(authModelState);
+  const { register, loading, error } = useAuth();
   const [signUpForm, setSignUpForm] = useState({
     email: "",
     password: "",
+    fullName: "",
     conformPassword: "",
   });
-  const [error, setError] = useState("");
+  const [formError, setFormError] = useState("");
   const searchBorder = useColorModeValue("blue.500", "#4A5568");
   const inputBg = useColorModeValue("gray.50", "#4A5568");
   const focusedInputBg = useColorModeValue("white", "#2D3748");
   const placeholderColor = useColorModeValue("gray.500", "#CBD5E0");
 
-  //console.log(signUpForm);
-
-  const [createUserWithEmailAndPassword, userCred, loading, userError] =
-    useCreateUserWithEmailAndPassword(auth);
-
-  const onSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+  const onSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (error) setError("");
+    setFormError("");
 
     if (signUpForm.password !== signUpForm.conformPassword) {
-      setError("Password Do Not Match");
+      setFormError("Passwords do not match");
       return;
     }
 
-    createUserWithEmailAndPassword(signUpForm.email, signUpForm.password);
+    if (signUpForm.password.length < 6) {
+      setFormError("Password must be at least 6 characters");
+      return;
+    }
+
+    if (!signUpForm.fullName.trim()) {
+      setFormError("Full name is required");
+      return;
+    }
+
+    try {
+      await register(signUpForm.email, signUpForm.password, signUpForm.fullName);
+      // Close modal on success (handled by AuthModel when user is set)
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : "Registration failed";
+      setFormError(errorMessage);
+    }
   };
 
   const onChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -47,19 +56,6 @@ const SignUp: React.FC = () => {
     }));
   };
 
-  const createUserDocument = async (user: User) => {
-    await addDoc(
-      collection(firestore, "users"),
-      JSON.parse(JSON.stringify(user))
-    );
-  };
-
-  useEffect(() => {
-    if (userCred) {
-      createUserDocument(userCred.user);
-    }
-  }, [userCred]);
-
   return (
     <form onSubmit={onSubmit}>
       <Input
@@ -67,6 +63,28 @@ const SignUp: React.FC = () => {
         name="email"
         placeholder="Email..."
         type="email"
+        mb={2}
+        onChange={onChange}
+        fontSize="10pt"
+        _placeholder={{ color: placeholderColor }}
+        _hover={{
+          bg: focusedInputBg,
+          border: "1px solid",
+          borderColor: searchBorder,
+        }}
+        _focus={{
+          outline: "none",
+          bg: focusedInputBg,
+          border: "1px solid",
+          borderColor: searchBorder,
+        }}
+        bg={inputBg}
+      />
+      <Input
+        required
+        name="fullName"
+        placeholder="Full Name..."
+        type="text"
         mb={2}
         onChange={onChange}
         fontSize="10pt"
@@ -129,15 +147,11 @@ const SignUp: React.FC = () => {
         }}
         bg={inputBg}
       />
-      {error ||
-        (userError && (
-          <Text textAlign="center" color="red" fontSize="10px">
-            {error ||
-              FIREBASE_ERRORS[
-                userError.message as keyof typeof FIREBASE_ERRORS
-              ]}
+      {(formError || error) && (
+        <Text textAlign="center" color="red" fontSize="10pt" mb={2}>
+          {formError || error?.message || "An error occurred"}
           </Text>
-        ))}
+      )}
       <Button
         width="100%"
         height="36px"

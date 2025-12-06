@@ -4,13 +4,19 @@ import {
   Flex,
   Icon,
   Image,
+  Modal,
+  ModalBody,
+  ModalCloseButton,
+  ModalContent,
+  ModalOverlay,
   Skeleton,
   Spinner,
   Stack,
   Text,
   useColorModeValue,
+  useDisclosure,
+  useToast,
 } from "@chakra-ui/react";
-import CryptoJS from "crypto-js";
 import moment from "moment";
 import Link from "next/link";
 import { useRouter } from "next/router";
@@ -28,8 +34,10 @@ import {
 } from "react-icons/io5";
 
 import { Post } from "../../atoms/PostAtom";
-
-// const secretPass = process.env.NEXT_PUBLIC_CRYPTO_SECRET_PASS;
+import { useAuth } from "../../contexts/AuthContext";
+import { postService } from "../../services/postService";
+import { useSetRecoilState } from "recoil";
+import { authModelState } from "../../atoms/authModalAtom";
 
 type PostItemProps = {
   post: Post;
@@ -58,14 +66,14 @@ const PostItem: React.FC<PostItemProps> = ({
   const [loadingImage, setLoadingImage] = useState(true);
   const [loadingDelete, setLoadingDelete] = useState(false);
   const [error, setError] = useState(false);
-  const [decryptedData, setDecryptedData] = useState({
-    title: "",
-    body: "",
-    creatorDisplayName: "",
-    imageURL: "",
-  });
+  const [isSaved, setIsSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
   const singlePostPage = !onSelectPost;
   const router = useRouter();
+  const { user } = useAuth();
+  const setAuthModalState = useSetRecoilState(authModelState);
+  const toast = useToast();
+  const { isOpen: isImageModalOpen, onOpen: onImageModalOpen, onClose: onImageModalClose } = useDisclosure();
 
   // Themes
   const bg = useColorModeValue("white", "#1A202C");
@@ -99,37 +107,128 @@ const PostItem: React.FC<PostItemProps> = ({
     setLoadingDelete(false);
   };
 
-  useEffect(() => {
-    const arr = [];
-    const arrName: string[] = [];
-
-    if (post.body) {
-      arr.push(post.title, post.body, post.creatorDisplayName, post.imageURL);
-      arrName.push("title", "body", "creatorDisplayName", "imageURL");
-    } else {
-      arr.push(post.title, post.creatorDisplayName, post.imageURL);
-      arrName.push("title", "creatorDisplayName", "imageURL");
+  const getCreatedAtText = () => {
+    const createdAt: any = post.createdAt;
+    if (createdAt?.seconds) {
+      return moment(new Date(createdAt.seconds * 1000)).fromNow();
     }
+    if (typeof createdAt === "string") {
+      return moment(new Date(createdAt)).fromNow();
+    }
+    try {
+      return moment(createdAt).fromNow();
+    } catch {
+      return "";
+    }
+  };
+
+  useEffect(() => {
+    const checkSaved = async () => {
+      if (!user || !post.id) return;
+      try {
+        const postIdNum = Number(post.id);
+        if (isNaN(postIdNum)) return;
+        const saved = await postService.getMySavedPost(postIdNum);
+        setIsSaved(!!saved);
+      } catch {
+
+      }
+    };
+    checkSaved();
+  }, [user, post.id]);
+
+  const handleToggleSave = async (
+    event: React.MouseEvent<HTMLDivElement, MouseEvent>
+  ) => {
+    event.stopPropagation();
+    if (!user) {
+      setAuthModalState({ open: true, view: "login" });
+      return;
+    }
+    if (!post.id) return;
 
     try {
-      for (let index = 0; index < arr.length; index++) {
-        if (arr[index]) {
-          const bytes = CryptoJS.AES.decrypt(
-            arr[index]!,
-            process.env.NEXT_PUBLIC_CRYPTO_SECRET_PASS as string
-          );
-          const data = JSON.parse(bytes.toString(CryptoJS.enc.Utf8));
+      setSaving(true);
+      const postIdNum = Number(post.id);
+      if (isNaN(postIdNum)) return;
 
-          setDecryptedData((prev) => ({
-            ...prev,
-            [arrName[index]]: data,
-          }));
-        } else return;
+      if (isSaved) {
+        await postService.unsavePost(postIdNum);
+        setIsSaved(false);
+        toast({
+          title: "Post unsaved",
+          status: "info",
+          duration: 2000,
+          isClosable: true,
+        });
+      } else {
+        await postService.savePost(postIdNum);
+        setIsSaved(true);
+        toast({
+          title: "Post saved",
+          status: "success",
+          duration: 2000,
+          isClosable: true,
+        });
       }
-    } catch (error) {
-      console.log(error);
+    } catch (e: any) {
+      console.error("Failed to toggle save:", e);
+      toast({
+        title: isSaved ? "Failed to unsave post" : "Failed to save post",
+        description: e.message || "An error occurred",
+        status: "error",
+        duration: 3000,
+        isClosable: true,
+      });
+    } finally {
+      setSaving(false);
     }
-  }, [post]);
+  };
+
+  const handleShare = async (
+    event: React.MouseEvent<HTMLDivElement, MouseEvent>
+  ) => {
+    event.stopPropagation();
+    
+    if (!post.id || !post.communityId) return;
+
+    const postUrl = `${window.location.origin}/r/${post.communityId}/comments/${post.id}`;
+    
+    try {
+      await navigator.clipboard.writeText(postUrl);
+      toast({
+        title: "Link copied to clipboard!",
+        status: "success",
+        duration: 2000,
+        isClosable: true,
+      });
+    } catch (err) {
+      const textArea = document.createElement("textarea");
+      textArea.value = postUrl;
+      textArea.style.position = "fixed";
+      textArea.style.left = "-999999px";
+      document.body.appendChild(textArea);
+      textArea.select();
+      try {
+        document.execCommand("copy");
+        toast({
+          title: "Link copied to clipboard!",
+          status: "success",
+          duration: 2000,
+          isClosable: true,
+        });
+      } catch (fallbackErr) {
+        toast({
+          title: "Failed to copy link",
+          status: "error",
+          duration: 2000,
+          isClosable: true,
+        });
+      } finally {
+        document.body.removeChild(textArea);
+      }
+    }
+  };
 
   return (
     <Flex
@@ -202,40 +301,49 @@ const PostItem: React.FC<PostItemProps> = ({
                     borderRadius="full"
                     boxSize="18px"
                     mr={2}
+                    alt="Community Avatar"
                   />
                 ) : (
                   <Icon as={FaReddit} fontSize="18px" color="blue.500" />
                 )}
-                <Link href={`r/${post.communityId}`}>
+                <Link href={`/r/${post.communityId}`}>
                   <Text
                     fontWeight={700}
                     _hover={{ textDecoration: "underline" }}
-                    onClick={(event) => event.stopPropagation}
-                  >{`r/${post.communityId}`}</Text>
+                    cursor="pointer"
+                    onClick={(e) => e.stopPropagation()}
+                  >{`r/${post.communityName || post.communityId}`}</Text>
                 </Link>
                 <Icon as={BsDot} color="gray.500" fontSize={8} />
               </>
             )}
             <Text>
-              Posted by u/{decryptedData.creatorDisplayName}{" "}
-              {moment(new Date(post.createdAt?.seconds * 1000)).fromNow()}
+              Posted by u/{post.creatorDisplayName || "anonymous"}{" "}
+              {getCreatedAtText()}
             </Text>
           </Stack>
           <Text fontSize="12pt" fontWeight={600}>
-            {decryptedData.title}
+            {post.title}
           </Text>
-          <Text fontSize="10pt">{decryptedData.body}</Text>
+          <Text fontSize="10pt">{post.body}</Text>
           {post.imageURL && (
             <Flex justify="center" align="center" p={2}>
               {loadingImage && (
                 <Skeleton height="200px" width="100%" borderRadius={4} />
               )}
               <Image
-                src={decryptedData.imageURL}
+                src={post.imageURL}
                 maxHeight="460px"
                 alt="Post Image"
                 display={loadingImage ? "none" : "unset"}
                 onLoad={() => setLoadingImage(false)}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onImageModalOpen();
+                }}
+                cursor="pointer"
+                _hover={{ opacity: 0.9 }}
+                transition="opacity 0.2s"
               />
             </Flex>
           )}
@@ -261,6 +369,7 @@ const PostItem: React.FC<PostItemProps> = ({
             _hover={{ bg: IconHoverBg, transform: "scale(1.05)" }}
             cursor="pointer"
             transition="all 0.2s ease-in-out"
+            onClick={handleShare}
           >
             <Icon as={IoArrowRedoOutline} mr={2} color={IconBg} />
             <Text fontSize="9pt" color={IconBg}>
@@ -274,10 +383,16 @@ const PostItem: React.FC<PostItemProps> = ({
             _hover={{ bg: IconHoverBg, transform: "scale(1.05)" }}
             cursor="pointer"
             transition="all 0.2s ease-in-out"
+            onClick={handleToggleSave}
           >
-            <Icon as={IoBookmarkOutline} mr={2} color={IconBg} />
+            <Icon
+              as={IoBookmarkOutline}
+              mr={2}
+              color={isSaved ? "orange.400" : IconBg}
+              aria-label={isSaved ? "Unsave post" : "Save post"}
+            />
             <Text fontSize="9pt" color={IconBg}>
-              Save
+              {saving ? "Saving..." : isSaved ? "Saved" : "Save"}
             </Text>
           </Flex>
           {userIsCreator && (
@@ -303,6 +418,30 @@ const PostItem: React.FC<PostItemProps> = ({
           )}
         </Flex>
       </Flex>
+      
+      {/* Image Modal/Lightbox */}
+      <Modal isOpen={isImageModalOpen} onClose={onImageModalClose} size="full">
+        <ModalOverlay bg="blackAlpha.800" />
+        <ModalContent bg="transparent" boxShadow="none">
+          <ModalCloseButton color="white" zIndex={1000} />
+          <ModalBody
+            display="flex"
+            alignItems="center"
+            justifyContent="center"
+            p={0}
+            onClick={onImageModalClose}
+          >
+            <Image
+              src={post.imageURL}
+              maxW="90vw"
+              maxH="90vh"
+              objectFit="contain"
+              alt="Post Image Fullscreen"
+              onClick={(e) => e.stopPropagation()}
+            />
+          </ModalBody>
+        </ModalContent>
+      </Modal>
     </Flex>
   );
 };

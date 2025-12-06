@@ -11,7 +11,8 @@ import {
   Text,
   VStack,
   HStack,
-  Spinner,
+  Skeleton,
+  SkeletonText,
   useColorModeValue,
 } from '@chakra-ui/react';
 import { IoNotificationsOutline } from 'react-icons/io5';
@@ -29,7 +30,7 @@ const NotificationBell: React.FC = () => {
   }, []);
 
   const formatTime = (dateString: string) => {
-    if (!isClient) return 'Loading...'; // Fallback for SSR
+    if (!isClient) return 'Loading...';
     
     const date = new Date(dateString);
     const now = new Date();
@@ -48,6 +49,7 @@ const NotificationBell: React.FC = () => {
           position="relative"
           cursor="pointer"
           padding={1}
+          paddingTop={2.5}
           borderRadius={4}
           _hover={{ bg: hoverBg }}
         >
@@ -89,14 +91,23 @@ const NotificationBell: React.FC = () => {
           </Box>
           
           <Box maxHeight="400px" overflowY="auto">
-            {loading ? (
-              <Box p={4} textAlign="center">
-                <Spinner />
-              </Box>
-            ) : !isClient ? (
-              <Box p={4} textAlign="center">
-                <Spinner />
-              </Box>
+            {loading || !isClient ? (
+              <VStack spacing={0} align="stretch">
+                {[...Array(5)].map((_, index) => (
+                  <Box
+                    key={index}
+                    p={3}
+                    borderBottom="1px solid"
+                    borderColor="gray.100"
+                  >
+                    <VStack align="start" spacing={2}>
+                      <Skeleton height="16px" width="80%" />
+                      <Skeleton height="14px" width="100%" />
+                      <Skeleton height="12px" width="40%" />
+                    </VStack>
+                  </Box>
+                ))}
+              </VStack>
             ) : !notifications || notifications.length === 0 ? (
               <Box p={4} textAlign="center">
                 <Text color="gray.500">No notifications yet</Text>
@@ -109,17 +120,25 @@ const NotificationBell: React.FC = () => {
                     p={3}
                     borderBottom="1px solid"
                     borderColor="gray.100"
-                    bg={!notification.read ? 'blue.50' : 'transparent'}
+                    bg={!notification.isRead ? 'blue.50' : 'transparent'}
                     cursor="pointer"
-                    onClick={() => markAsRead(notification.id)}
+                    onClick={() => {
+                      if (!notification.isRead) {
+                        markAsRead(notification.id);
+                      }
+                      // Navigate to post if available
+                      if (notification.metadata?.evt?.target?.postId) {
+                        window.location.href = `/r/${notification.metadata.evt.target.postId}/comments/${notification.metadata.evt.target.postId}`;
+                      }
+                    }}
                     _hover={{ bg: 'gray.50' }}
                   >
                     <VStack align="start" spacing={1}>
-                      <Text fontWeight={notification.read ? 'normal' : 'bold'}>
+                      <Text fontWeight={notification.isRead ? 'normal' : 'bold'}>
                         {notification.title}
                       </Text>
                       <Text fontSize="sm" color="gray.600">
-                        {notification.message}
+                        {notification.body}
                       </Text>
                       <Text fontSize="xs" color="gray.400">
                         {formatTime(notification.createdAt)}

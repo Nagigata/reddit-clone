@@ -6,18 +6,43 @@ import {
   Text,
   useColorModeValue,
 } from "@chakra-ui/react";
+import { useRouter } from "next/router";
 import React, { useState } from "react";
 import { FaReddit } from "react-icons/fa";
+import { useSetRecoilState } from "recoil";
 
-import { useAuthState } from "react-firebase-hooks/auth";
-import { auth } from "../../firebase/clientApp";
+import { authModelState } from "../../atoms/authModalAtom";
+import { useAuth } from "../../contexts/AuthContext";
+import useDirectory from "../../hooks/useDirectory";
 import CreateCommunityModel from "../Modal/CreateCommunity/CreateCommunityModel";
 
 const PersonalHome: React.FC = () => {
-  const [user] = useAuthState(auth);
+  const { user: authUser } = useAuth();
+  const router = useRouter();
+  const { toggleMenuOpen } = useDirectory();
+  const setAuthModalState = useSetRecoilState(authModelState);
   const [open, setOpen] = useState(false);
   const bg = useColorModeValue("white", "#1A202C");
   const borderColor = useColorModeValue("gray.300", "#2D3748");
+
+  const handleCreatePost = () => {
+    if (!authUser) {
+      setAuthModalState({ open: true, view: "login" });
+      return;
+    }
+
+    // If not on home page, navigate to home first
+    if (router.asPath !== "/") {
+      router.push("/");
+      // Wait a bit for navigation, then open directory menu
+      setTimeout(() => {
+        toggleMenuOpen();
+      }, 100);
+    } else {
+      // Already on home page, just open directory menu
+      toggleMenuOpen();
+    }
+  };
 
   return (
     <Flex
@@ -50,9 +75,11 @@ const PersonalHome: React.FC = () => {
           <Text fontSize="9pt">
             Your personal Reddit frontpage, built for you.
           </Text>
-          <Button height="30px">Create Post</Button>
+          <Button height="30px" onClick={handleCreatePost}>
+            Create Post
+          </Button>
           <Button
-            disabled={!user}
+            disabled={!authUser}
             variant="outline"
             height="30px"
             onClick={() => {

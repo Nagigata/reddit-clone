@@ -1,39 +1,29 @@
 import {
   Alert,
   AlertIcon,
+  Box,
+  Button,
   Flex,
   Icon,
   Text,
   useColorModeValue,
 } from "@chakra-ui/react";
-import CryptoJS from "crypto-js";
-import { User } from "firebase/auth";
-import {
-  addDoc,
-  collection,
-  serverTimestamp,
-  Timestamp,
-  updateDoc,
-} from "firebase/firestore";
-import { getDownloadURL, ref, uploadString } from "firebase/storage";
 import { useRouter } from "next/router";
 import React, { useState } from "react";
 import { BiPoll } from "react-icons/bi";
 import { BsLink45Deg, BsMic } from "react-icons/bs";
 import { IoDocumentText, IoImageOutline } from "react-icons/io5";
 
-import { Post } from "../../atoms/PostAtom";
-import { firestore, storage } from "../../firebase/clientApp";
 import useSelectFile from "../../hooks/useSelectFile";
+import { postService } from "../../services/postService";
+import { useAuth } from "../../contexts/AuthContext";
+import useCommunityData from "../../hooks/useCommunityData";
 import ImageUpload from "./postsForm/ImageUpload";
 import TextInput from "./postsForm/TextInput";
 //@ts-ignore
 import TabItem from "./TabItem";
 
-// const secretPass = process.env.NEXT_PUBLIC_CRYPTO_SECRET_PASS;
-
 type NewPostFormProps = {
-  user: User;
   communityImageURL?: string;
 };
 
@@ -66,66 +56,77 @@ export type TabItem = {
 };
 
 const NewPostForm: React.FC<NewPostFormProps> = ({
-  user,
   communityImageURL,
 }) => {
   const router = useRouter();
+  const { user } = useAuth();
+  const { communityStateValue } = useCommunityData();
   const [selectedTab, setSelectTab] = useState(formTabs[0].title);
   const [textInput, setTextInput] = useState({
     title: "",
     body: "",
   });
-  const [encryptedData, setEncryptedData] = useState({
-    title: "",
-    body: "",
-  });
   //const [selectedFile, setSelectedFile] = useState<string>();
   const { selectedFile, setSelectedFile, onSelectedFile } = useSelectFile();
+  const [selectedFileObj, setSelectedFileObj] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
   const bg = useColorModeValue("white", "#1A202C");
+  const borderColor = useColorModeValue("gray.300", "#2D3748");
+
+  const currentCommunity = communityStateValue.currentCommunity;
+  
+  // Check if user is a member (status APPROVED)
+  const isMember = !!communityStateValue.mySnippets.find(
+    (snippet) => snippet.communityId === currentCommunity?.id
+  );
+  const isCreator = user && currentCommunity && String(user.id) === currentCommunity.creatorId;
+  const hasAccess = isMember || isCreator;
+
+  // Private or Restricted: only members can create posts
+  const isPrivate = currentCommunity?.typeId === 1;
+  const isRestricted = currentCommunity?.typeId === 3;
+  const requiresMembership = isPrivate || isRestricted;
+  const canCreatePost = !requiresMembership || hasAccess;
 
   const handleCreatePost = async () => {
-    const { communityId } = router.query;
-    // create new post
+    if (!user) return;
 
-    const splitName = user.email!.split("@")[0];
-
-    const dataName = CryptoJS.AES.encrypt(
-      JSON.stringify(splitName),
-      process.env.NEXT_PUBLIC_CRYPTO_SECRET_PASS as string
-    ).toString();
-
-    const newPost: Post = {
-      communityId: communityId as string,
-      creatorId: user.uid,
-      communityImageURL: communityImageURL || "",
-      creatorDisplayName: dataName,
-      title: encryptedData.title,
-      body: encryptedData.body,
-      numberOfComments: 0,
-      voteStatus: 0,
-      createdAt: serverTimestamp() as Timestamp,
-    };
+    // Check access for private/restricted communities
+    if (requiresMembership && !hasAccess) {
+      setError(true);
+      return;
+    }
 
     setLoading(true);
     try {
-      const postDocRef = await addDoc(collection(firestore, "posts"), newPost);
+      const subreddit_id =
+        currentCommunity?.backendId ?? 
+        (currentCommunity?.id ? Number(currentCommunity.id) : undefined);
 
-      if (selectedFile) {
-        const imageRef = ref(storage, `posts/${postDocRef.id}/image`);
-        await uploadString(imageRef, selectedFile, "data_url");
-        const downloadURL = await getDownloadURL(imageRef);
-
-        const encryptDownloadURL = CryptoJS.AES.encrypt(
-          JSON.stringify(downloadURL),
-          process.env.NEXT_PUBLIC_CRYPTO_SECRET_PASS as string
-        ).toString();
-
-        await updateDoc(postDocRef, {
-          imageURL: encryptDownloadURL,
-        });
+      // Determine media_type based on selected tab and file
+      let media_type: string | undefined;
+      if (selectedTab === "Images & Video" && selectedFileObj) {
+        // Determine media type from file
+        const fileType = selectedFileObj.type;
+        if (fileType.startsWith('image/')) {
+          media_type = 'image';
+        } else if (fileType.startsWith('video/')) {
+          media_type = 'video';
+        } else {
+          media_type = 'image'; // default
+        }
       }
+
+      await postService.createPost({
+        title: textInput.title,
+        content: textInput.body || undefined,
+        subreddit_id:
+          subreddit_id && !isNaN(subreddit_id) ? subreddit_id : undefined,
+        media_type: media_type,
+        file: selectedFileObj || undefined,
+      });
+
       router.back();
     } catch (error: any) {
       console.log(error.message);
@@ -134,50 +135,44 @@ const NewPostForm: React.FC<NewPostFormProps> = ({
     setLoading(false);
   };
 
-  /*
-  const onSelectedImage = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const reader = new FileReader();
-
-    if (event.target.files?.[0]) {
-      reader.readAsDataURL(event.target.files[0]);
-    }
-
-    reader.onload = (readerEvent) => {
-      if (readerEvent.target?.result) {
-        setSelectedFile(readerEvent.target.result as string);
-      }
-    };
-  };
-*/
-
-  const encryptData = (name: string, value: string) => {
-    try {
-      const data = CryptoJS.AES.encrypt(
-        JSON.stringify(value),
-        process.env.NEXT_PUBLIC_CRYPTO_SECRET_PASS as string
-      ).toString();
-
-      setEncryptedData((prev) => ({
-        ...prev,
-        [name]: data,
-      }));
-    } catch (error) {
-      console.log(error);
-    }
-  };
-
   const onTextChange = (
     event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   ) => {
     const {
       target: { name, value },
     } = event;
-    encryptData(name, value);
     setTextInput((prev) => ({
       ...prev,
       [name]: value,
     }));
   };
+
+  // Show access denied message for private/restricted communities
+  if (requiresMembership && !hasAccess) {
+    return (
+      <Box
+        p={8}
+        textAlign="center"
+        bg={bg}
+        borderRadius={4}
+        border="1px solid"
+        borderColor={borderColor}
+        mt={2}
+      >
+        <Text fontSize="16pt" fontWeight={600} mb={2}>
+          {isPrivate ? "This is a private community" : "This is a restricted community"}
+        </Text>
+        <Text fontSize="10pt" color="gray.500" mb={4}>
+          {isPrivate 
+            ? "You must be a member to create posts"
+            : "You must join this community to create posts"}
+        </Text>
+        <Button onClick={() => router.push(`/r/${currentCommunity?.id}`)}>
+          {isPrivate ? "Join Community" : "Join to Post"}
+        </Button>
+      </Box>
+    );
+  }
 
   return (
     <Flex direction="column" bg={bg} borderRadius={4} mt={2}>
@@ -203,16 +198,34 @@ const NewPostForm: React.FC<NewPostFormProps> = ({
         {selectedTab === "Images & Video" && (
           <ImageUpload
             selectedFile={selectedFile}
-            onSelectedImage={onSelectedFile}
+            onSelectedImage={(event) => {
+              onSelectedFile(event);
+              // Also store the File object
+              if (event.target.files?.[0]) {
+                setSelectedFileObj(event.target.files[0]);
+              }
+            }}
             setSelectTab={setSelectTab}
-            setSelectedFile={setSelectedFile}
+            setSelectedFile={(value) => {
+              setSelectedFile(value);
+              if (!value) {
+                setSelectedFileObj(null);
+              }
+            }}
+            handleCreatePost={handleCreatePost}
+            loading={loading}
+            title={textInput.title}
           />
         )}
       </Flex>
       {error && (
         <Alert status="error">
           <AlertIcon />
-          <Text mr={2}>Error Creating Post</Text>
+          <Text mr={2}>
+            {requiresMembership && !hasAccess
+              ? "You must be a member to create posts"
+              : "Error Creating Post"}
+          </Text>
         </Alert>
       )}
     </Flex>

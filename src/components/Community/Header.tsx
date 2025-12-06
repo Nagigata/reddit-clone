@@ -23,6 +23,9 @@ const Header: React.FC<HeaderProps> = ({ communityData }) => {
   const isJoined = !!communityStateValue.mySnippets.find(
     (item) => item.communityId === communityData.id
   );
+  const isPending = communityStateValue.pendingCommunityIds?.includes(
+    communityData.id
+  );
 
   return (
     <Flex direction="column" width="100%" height="146px">
@@ -58,10 +61,10 @@ const Header: React.FC<HeaderProps> = ({ communityData }) => {
           <Flex padding="10px 16px">
             <Flex direction="column" mr={6}>
               <Text fontWeight={800} fontSize="16px">
-                {communityData.id}
+                {communityData.name}
               </Text>
               <Text fontWeight={600} fontSize="10px" color="gray.500">
-                r/{communityData.id}
+                r/{communityData.name}
               </Text>
             </Flex>
             <Button
@@ -70,13 +73,14 @@ const Header: React.FC<HeaderProps> = ({ communityData }) => {
               pr={6}
               pl={6}
               isLoading={loading}
+              isDisabled={isPending}
               onClick={() => {
                 onJoinOrCommunity(communityData, isJoined);
               }}
               _hover={{ transform: "translateY(-1px)", boxShadow: "md" }}
               transition="all 0.2s ease-in-out"
             >
-              {isJoined ? "Joined" : "Join"}
+              {isPending ? "Pending" : isJoined ? "Joined" : "Join"}
             </Button>
           </Flex>
         </Flex>

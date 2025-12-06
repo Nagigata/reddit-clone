@@ -11,7 +11,6 @@ import {
   Text,
   useColorMode,
 } from "@chakra-ui/react";
-import { signOut, User } from "firebase/auth";
 import React from "react";
 import { CgProfile } from "react-icons/cg";
 import { FaRedditSquare } from "react-icons/fa";
@@ -23,7 +22,8 @@ import { IoSparkles } from "react-icons/io5";
 import { IoNotificationsOutline } from "react-icons/io5";
 import { useSetRecoilState } from "recoil";
 import { authModelState } from "../../atoms/authModalAtom";
-import { auth } from "../../firebase/clientApp";
+import { useAuth } from "../../contexts/AuthContext";
+import { User } from "../../services/userService";
 
 type UserMenuProps = {
   user?: User | null;
@@ -33,20 +33,21 @@ const UserMenu: React.FC<UserMenuProps> = ({ user }) => {
   const router = useRouter();
   const setAuthModalState = useSetRecoilState(authModelState);
   const { colorMode, toggleColorMode } = useColorMode();
+  const { logout } = useAuth();
 
   const handelNavigatePage = () => {
     if (user) {
       router.push({
-        pathname: `/profile/${user?.uid}`,
+        pathname: `/profile/${user?.id}`,
         query: {
-          uid: user?.uid.toString(),
+          uid: user?.id.toString(),
         },
       });
     }
   };
 
-  const logout = async () => {
-    await signOut(auth);
+  const handleLogout = () => {
+    logout();
   };
 
   return (
@@ -75,7 +76,7 @@ const UserMenu: React.FC<UserMenuProps> = ({ user }) => {
                   mr={8}
                 >
                   <Text fontWeight={700}>
-                    {user?.displayName || user?.email?.split("@")[0]}
+                    {user?.profile?.full_name || user?.email?.split("@")[0]}
                   </Text>
                   {/* <Flex alignItems="center">
                     <Icon as={IoSparkles} color="brand.100" mr={1} />
@@ -129,7 +130,7 @@ const UserMenu: React.FC<UserMenuProps> = ({ user }) => {
               fontSize="10px"
               fontWeight={700}
               _hover={{ bg: "blue.500", color: "white" }}
-              onClick={logout}
+              onClick={handleLogout}
             >
               <Flex align="center">
                 <Icon fontSize={20} mr={2} as={MdOutlineLogin} />

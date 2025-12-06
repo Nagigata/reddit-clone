@@ -6,11 +6,10 @@ import {
   Spinner,
   Stack,
   Text,
+  useColorModeValue,
 } from "@chakra-ui/react";
-import CryptoJS from "crypto-js";
-import { Timestamp } from "firebase/firestore";
 import moment from "moment";
-import React, { useEffect, useState } from "react";
+import React from "react";
 import {
   IoArrowDownCircleOutline,
   IoArrowUpCircleOutline,
@@ -20,12 +19,14 @@ export type Comment = {
   id?: string;
   creatorId: string;
   creatorDisplayText: string;
-  creatorPhotoURL: string;
-  communityId: string;
+  creatorPhotoURL?: string;
+  communityId?: string;
   postId: string;
-  postTitle: string;
+  postTitle?: string;
   text: string;
-  createdAt: Timestamp;
+  createdAt: any;
+  voteStatus?: number;
+  userVoteValue?: number;
 };
 
 type CommentItemProps = {
@@ -33,6 +34,8 @@ type CommentItemProps = {
   onDeleteComment: (comment: Comment) => void;
   isLoading: boolean;
   userId?: string;
+  onVote?: (comment: Comment, value: number) => void;
+  onReply?: (comment: Comment) => void;
 };
 
 const CommentItem: React.FC<CommentItemProps> = ({
@@ -40,62 +43,97 @@ const CommentItem: React.FC<CommentItemProps> = ({
   onDeleteComment,
   isLoading,
   userId,
+  onVote,
+  onReply,
 }) => {
-  const [decryptedData, setDecryptedData] = useState({
-    text: "",
-    creatorDisplayText: "",
-  });
+  const borderColor = useColorModeValue("gray.200", "gray.600");
+  const bg = useColorModeValue("white", "gray.800");
+  const mutedText = useColorModeValue("gray.500", "gray.400");
 
-  useEffect(() => {
-    const arr = [comment.text, comment.creatorDisplayText];
-    const arrName = ["text", "creatorDisplayText"];
-
-    try {
-      for (let index = 0; index < arr.length; index++) {
-        if (arr[index]) {
-          const bytes = CryptoJS.AES.decrypt(
-            arr[index]!,
-            process.env.NEXT_PUBLIC_CRYPTO_SECRET_PASS as string
-          );
-          const data = JSON.parse(bytes.toString(CryptoJS.enc.Utf8));
-
-          setDecryptedData((prev) => ({
-            ...prev,
-            [arrName[index]]: data,
-          }));
-        } else return;
-      }
-    } catch (error) {
-      console.log(error);
+  const getCreatedAtText = () => {
+    const createdAt: any = comment.createdAt;
+    if (createdAt?.seconds) {
+      return moment(new Date(createdAt.seconds * 1000)).fromNow();
     }
-  }, [comment]);
+    if (typeof createdAt === "string") {
+      return moment(new Date(createdAt)).fromNow();
+    }
+    try {
+      return moment(createdAt).fromNow();
+    } catch {
+      return "";
+    }
+  };
+
+  const handleVote = (value: number) => {
+    if (!onVote) return;
+    onVote(comment, value);
+  };
 
   return (
-    <Flex>
-      <Box mr={2}>
+    <Flex
+      p={3}
+      borderRadius={6}
+      border="1px solid"
+      borderColor={borderColor}
+      bg={bg}
+      _hover={{ borderColor: "blue.400" }}
+      transition="all 0.15s ease-in-out"
+    >
+      <Box mr={3}>
         <Avatar
           src={comment.creatorPhotoURL}
           size="sm"
-          name={decryptedData.creatorDisplayText}
+          name={comment.creatorDisplayText || "anonymous"}
         />
       </Box>
-      <Stack spacing={1}>
-        <Stack direction="row" align="center" fontSize="8px">
-          <Text>{decryptedData.creatorDisplayText}</Text>
-          <Text>
-            {moment(new Date(comment.createdAt?.seconds * 1000)).fromNow()}
+      <Stack spacing={1} flex={1}>
+        <Stack direction="row" align="center" fontSize="9px" color={mutedText}>
+          <Text fontWeight={600} color="gray.700">
+            {comment.creatorDisplayText || "anonymous"}
           </Text>
+          <Text>• {getCreatedAtText()}</Text>
           {isLoading && <Spinner size="sm" />}
         </Stack>
-        <Text fontSize="10pt">{decryptedData.text}</Text>
-        <Stack direction="row" align="center" cursor="pointer" color="gray.500">
-          <Icon as={IoArrowUpCircleOutline} />
-          <Icon as={IoArrowDownCircleOutline} />
+        <Text fontSize="10pt">{comment.text}</Text>
+        <Stack
+          direction="row"
+          align="center"
+          spacing={4}
+          mt={1}
+          fontSize="9pt"
+          color={mutedText}
+        >
+          <Flex align="center">
+            <Icon
+              as={IoArrowUpCircleOutline}
+              mr={1}
+              fontSize={16}
+              cursor="pointer"
+              color={comment.userVoteValue === 1 ? "blue.400" : mutedText}
+              onClick={() => handleVote(1)}
+            />
+            <Text fontWeight={600}>{comment.voteStatus ?? 0}</Text>
+            <Icon
+              as={IoArrowDownCircleOutline}
+              ml={1}
+              fontSize={16}
+              cursor="pointer"
+              color={comment.userVoteValue === -1 ? "blue.400" : mutedText}
+              onClick={() => handleVote(-1)}
+            />
+          </Flex>
+          {onReply && (
+            <Text
+              _hover={{ color: "blue.500" }}
+              cursor="pointer"
+              onClick={() => onReply(comment)}
+            >
+              Reply
+            </Text>
+          )}
           {userId === comment.creatorId && (
             <>
-              <Text fontSize="9pt" _hover={{ color: "blue.500" }}>
-                Edit
-              </Text>
               <Text
                 fontSize="9pt"
                 _hover={{ color: "blue.500" }}

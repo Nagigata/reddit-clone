@@ -1,22 +1,20 @@
-import { User } from "firebase/auth";
-import { doc, getDoc } from "firebase/firestore";
 import { motion } from "framer-motion";
 import Head from "next/head";
 import { useRouter } from "next/router";
 import React, { useEffect } from "react";
-import { useAuthState } from "react-firebase-hooks/auth";
 
 import { Post } from "../../../../atoms/PostAtom";
 import About from "../../../../components/Community/About";
 import PageContent from "../../../../components/Layout/PageContent";
 import Comments from "../../../../components/posts/Comments/Comments";
 import PostItem from "../../../../components/posts/PostItem";
-import { auth, firestore } from "../../../../firebase/clientApp";
+import { useAuth } from "../../../../contexts/AuthContext";
 import useCommunityData from "../../../../hooks/useCommunityData";
 import usePosts from "../../../../hooks/usePosts";
+import { postService } from "../../../../services/postService";
 
 const PostPage: React.FC = () => {
-  const [user] = useAuthState(auth);
+  const { user } = useAuth();
   const router = useRouter();
   const { communityStateValue } = useCommunityData();
   const { postStateValue, setPostStateValue, onVote, onDeletePost } =
@@ -24,13 +22,64 @@ const PostPage: React.FC = () => {
 
   const fetchPost = async (postId: string) => {
     try {
-      const postDocRef = doc(firestore, "posts", postId);
-      const postDoc = await getDoc(postDocRef);
+      const p = await postService.getPostById(Number(postId));
+      let voteStatus = 0;
+      if (p.vote_count !== undefined) {
+        voteStatus = p.vote_count;
+      } else if (p.upvotes !== undefined && p.downvotes !== undefined) {
+        voteStatus = p.upvotes - p.downvotes;
+      }
+
+      const creatorDisplayName =
+        p.author?.full_name ||
+        p.author?.email?.split("@")[0] ||
+        "anonymous";
+
+      const communityName =
+        p.community?.name || String(p.subreddit_id || "");
+
+      const communityImageURL = p.community?.avatar || "";
+
+      const mapped: Post = {
+        id: String(p.id),
+        communityId: String(p.subreddit_id || ""),
+        communityName,
+        creatorId: String(p.author_id),
+        creatorDisplayName,
+        title: p.title,
+        body: p.content ?? "",
+        numberOfComments: Number(p.nr_of_comments || 0),
+        voteStatus,
+        imageURL: p.media?.[0]?.media_url,
+        communityImageURL,
+        createdAt: p.created_at 
+          ? { seconds: new Date(p.created_at).getTime() / 1000 } as any
+          : { seconds: Date.now() / 1000 } as any,
+      };
+
+      // Map my_vote vào postVotes nếu có
+      const postVotes = p.my_vote !== undefined && p.my_vote !== 0
+        ? [
+            {
+              id: `vote-${p.id}`,
+              postId: String(p.id),
+              communityId: mapped.communityId,
+              voteValue: p.my_vote,
+            },
+          ]
+        : [];
+
       setPostStateValue((prev) => ({
         ...prev,
-        selectedPost: { id: postDoc.id, ...postDoc.data() } as Post,
-      }));
-    } catch (error) {}
+        selectedPost: mapped,
+              postVotes: [
+          ...prev.postVotes.filter((v) => v.postId !== String(p.id)),
+          ...postVotes,
+              ],
+            }));
+    } catch (error) {
+      console.log("fetchPost error", error);
+    }
   };
 
   useEffect(() => {
@@ -39,6 +88,7 @@ const PostPage: React.FC = () => {
     if (pid && !postStateValue.selectedPost) {
       fetchPost(pid as string);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router.query, postStateValue.selectedPost]);
 
   return (
@@ -65,12 +115,11 @@ const PostPage: React.FC = () => {
                 )?.voteValue
               }
               userIsCreator={
-                user?.uid === postStateValue.selectedPost?.creatorId
+                String(user?.id) === postStateValue.selectedPost?.creatorId
               }
             />
           )}
           <Comments
-            user={user as User}
             selectedPost={postStateValue.selectedPost}
             communityId={postStateValue.selectedPost?.communityId as string}
           />

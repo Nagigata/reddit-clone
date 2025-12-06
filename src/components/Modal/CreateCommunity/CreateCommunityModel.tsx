@@ -16,20 +16,14 @@ import {
   Text,
   useColorModeValue,
 } from "@chakra-ui/react";
-import {
-  doc,
-  runTransaction,
-  serverTimestamp,
-  Timestamp,
-} from "firebase/firestore";
 import { useRouter } from "next/router";
 import React, { useState } from "react";
-import { useAuthState } from "react-firebase-hooks/auth";
 import { BsFillEyeFill, BsFillPersonFill } from "react-icons/bs";
 import { HiLockClosed } from "react-icons/hi";
 
-import { auth, firestore } from "../../../firebase/clientApp";
+import { useAuth } from "../../../contexts/AuthContext";
 import useDirectory from "../../../hooks/useDirectory";
+import { communityService } from "../../../services/communityService";
 
 type CreateCommunityModelProps = {
   open: boolean;
@@ -40,7 +34,7 @@ const CreateCommunityModel: React.FC<CreateCommunityModelProps> = ({
   open,
   handleClose,
 }) => {
-  const [user] = useAuthState(auth);
+  const { user } = useAuth();
   const [CommunitiesName, setCommunities] = useState("");
   const [charsRemaining, setCharsRemaining] = useState(21);
   const [communityType, setCommunityType] = useState("");
@@ -67,6 +61,11 @@ const CreateCommunityModel: React.FC<CreateCommunityModelProps> = ({
   const handleCreateCommunity = async () => {
     if (error) setError("");
 
+    if (!user) {
+      setError("Please login to create a community");
+      return;
+    }
+
     const format = /[ `!@#$%^&*()+\-=\[\]{};':"\\|,.<>\/?~]/;
 
     if (format.test(CommunitiesName) || CommunitiesName.length < 3) {
@@ -78,68 +77,44 @@ const CreateCommunityModel: React.FC<CreateCommunityModelProps> = ({
     setLoading(true);
 
     try {
-      const communityDocRef = doc(firestore, "communities", CommunitiesName);
+      // Map communityType to type_id 
+      let typeId = 2; 
+      if (communityType === "private") typeId = 1;
+      if (communityType === "restricted") typeId = 3;
+      
 
-      await runTransaction(firestore, async (transaction) => {
-        const communityDoc = await transaction.get(communityDocRef);
-        if (communityDoc.exists()) {
-          throw new Error(
-            `Sorry, r/${CommunitiesName} is MdTakeoutDining. Try Another`
-          );
-          return;
-        }
+      // Tạo community
+      const created = await communityService.createCommunity({
+        name: CommunitiesName,
+        type_id: typeId,
+        created_by: user.id,
+      });
 
-        await transaction.set(communityDocRef, {
-          creatorId: user?.uid,
-          createdAt: serverTimestamp(),
-          numberOfMembers: 1,
-          privacyTYpe: communityType,
-        });
+      const createdCommunityId = created.community_id ?? created.id;
 
-        //update
-        updateCommunitySnippet(user?.uid!, transaction);
+      if (!createdCommunityId) {
+        throw new Error("Missing community id from API response");
+      }
 
-        // create
-        transaction.set(
-          doc(
-            firestore,
-            `users/${user?.uid}/communitySnippets`,
-            CommunitiesName
-          ),
-          {
-            communityId: CommunitiesName,
-            isModerator: true,
-            updateTimeStamp: serverTimestamp() as Timestamp,
-          }
-        );
+      // Tự động join community sau khi tạo
+      await communityService.joinCommunity({
+        community_id: createdCommunityId,
+        user_id: user.id,
+        status: "APPROVED",
       });
 
       handleClose();
       toggleMenuOpen();
       setCommunityType("");
       setCommunities("");
-      router.push(`r/${CommunitiesName}`);
+      // Navigate using ID instead of name
+      router.push(`/r/${createdCommunityId}`);
     } catch (error: any) {
       console.log("HandleCreateCommunity Error", error);
-      setError(error.message);
+      setError(error.message || "Failed to create community. Please try again.");
     }
 
     setLoading(false);
-    //setError("")
-  };
-
-  const updateCommunitySnippet = async (userId: string, transaction: any) => {
-    if (!userId) return;
-
-    const communityUpdateDocRef = doc(
-      firestore,
-      `communities/${CommunitiesName}/userInCommunity/${userId}`
-    );
-
-    await transaction.set(communityUpdateDocRef, {
-      userId: userId,
-      userEmail: user?.email,
-    });
   };
 
   return (
