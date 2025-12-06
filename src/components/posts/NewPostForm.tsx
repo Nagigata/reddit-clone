@@ -125,7 +125,7 @@ const NewPostForm: React.FC<NewPostFormProps> = ({
           subreddit_id && !isNaN(subreddit_id) ? subreddit_id : undefined,
         media_type: media_type,
         file: selectedFileObj || undefined,
-      });
+        });
 
       router.back();
     } catch (error: any) {

@@ -176,7 +176,7 @@ const CommentItem: React.FC<CommentItemProps> = ({
 
           {/* Action Buttons */}
           <Flex align="center" gap={3} ml={2}>
-            {onReply && (
+          {onReply && (
               <Button
                 variant="ghost"
                 size="xs"
@@ -187,15 +187,15 @@ const CommentItem: React.FC<CommentItemProps> = ({
                   color: "blue.500",
                   bg: replyHoverBg
                 }}
-                onClick={() => onReply(comment)}
+              onClick={() => onReply(comment)}
                 px={2}
                 py={1}
                 h="auto"
-              >
-                Reply
+            >
+              Reply
               </Button>
-            )}
-            {userId === comment.creatorId && (
+          )}
+          {userId === comment.creatorId && (
               <Button
                 variant="ghost"
                 size="xs"
@@ -213,7 +213,7 @@ const CommentItem: React.FC<CommentItemProps> = ({
               >
                 Delete
               </Button>
-            )}
+          )}
           </Flex>
         </Flex>
       </Stack>

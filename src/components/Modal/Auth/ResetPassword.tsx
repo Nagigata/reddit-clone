@@ -19,7 +19,7 @@ const ResetPassword: React.FC = () => {
     try {
       // TODO: Implement password reset API call
       // await userService.resetPassword(email);
-      setSuccess(true);
+    setSuccess(true);
     } catch (err: any) {
       setError(err.message || "Failed to send reset email");
     } finally {
@@ -67,7 +67,7 @@ const ResetPassword: React.FC = () => {
             {error && (
               <Text textAlign="center" fontSize="10pt" color="red" mb={2}>
                 {error}
-              </Text>
+            </Text>
             )}
             <Button
               width="100%"

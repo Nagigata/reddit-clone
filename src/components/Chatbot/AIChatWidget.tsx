@@ -17,7 +17,7 @@ import {
 } from "@chakra-ui/react";
 import { motion, AnimatePresence } from "framer-motion";
 import React, { useState, useRef, useEffect } from "react";
-import { BsChatDotsFill, BsX, BsSend, BsRobot } from "react-icons/bs";
+import { BsChatDotsFill, BsX, BsSend, BsRobot, BsArrowsAngleContract, BsArrowsAngleExpand } from "react-icons/bs";
 import { IoSparkles } from "react-icons/io5";
 import { factCheckService } from "../../services/factCheckService";
 
@@ -43,6 +43,7 @@ const AIChatWidget: React.FC<AIChatWidgetProps> = ({
   initialMessages = [],
 }) => {
   const [isOpen, setIsOpen] = useState(false);
+  const [isMaximized, setIsMaximized] = useState(false);
   const [messages, setMessages] = useState<Message[]>(
     initialMessages.length > 0
       ? initialMessages
@@ -192,16 +193,22 @@ const AIChatWidget: React.FC<AIChatWidgetProps> = ({
         {isOpen && (
           <motion.div
             initial={{ opacity: 0, y: 20, scale: 0.9 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
+            animate={{ 
+              opacity: 1, 
+              y: 0, 
+              scale: 1,
+              width: isMaximized ? "90vw" : "380px",
+              height: isMaximized ? "90vh" : "600px",
+              bottom: isMaximized ? "5vh" : "90px",
+              right: isMaximized ? "5vw" : "20px",
+            }}
             exit={{ opacity: 0, y: 20, scale: 0.9 }}
-            transition={{ duration: 0.2 }}
+            transition={{ duration: 0.3 }}
             style={{
               position: "fixed",
-              bottom: "90px",
-              right: "20px",
-              width: "380px",
-              height: "600px",
               zIndex: 999,
+              maxWidth: isMaximized ? "90vw" : "380px",
+              maxHeight: isMaximized ? "90vh" : "600px",
             }}
           >
             <Box
@@ -230,15 +237,26 @@ const AIChatWidget: React.FC<AIChatWidgetProps> = ({
                     AI Assistant
                   </Text>
                 </HStack>
-                <IconButton
-                  aria-label="Close chat"
-                  icon={<BsX />}
-                  size="lg"
-                  variant="ghost"
-                  color="white"
-                  _hover={{ bg: "rgba(255,255,255,0.2)" }}
-                  onClick={() => setIsOpen(false)}
-                />
+                <HStack spacing={2}>
+                  <IconButton
+                    aria-label={isMaximized ? "Minimize chat" : "Maximize chat"}
+                    icon={<Icon as={isMaximized ? BsArrowsAngleContract : BsArrowsAngleExpand} />}
+                    size="md"
+                    variant="ghost"
+                    color="white"
+                    _hover={{ bg: "rgba(255,255,255,0.2)" }}
+                    onClick={() => setIsMaximized(!isMaximized)}
+                  />
+                  <IconButton
+                    aria-label="Close chat"
+                    icon={<BsX />}
+                    size="lg"
+                    variant="ghost"
+                    color="white"
+                    _hover={{ bg: "rgba(255,255,255,0.2)" }}
+                    onClick={() => setIsOpen(false)}
+                  />
+                </HStack>
               </Flex>
 
               {/* Messages */}

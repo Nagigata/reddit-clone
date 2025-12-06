@@ -149,10 +149,10 @@ function ProfileSide({}: Props) {
         >
           <Text fontWeight="bold" fontSize="11pt" mb={2}>
             Email
-          </Text>
+            </Text>
           <Text fontWeight="medium" fontSize="10pt" color="gray.600">
             {user?.email}
-          </Text>
+            </Text>
         </Flex>
         <Flex
           flex={1}
@@ -165,14 +165,14 @@ function ProfileSide({}: Props) {
         >
           <Text fontWeight="bold" fontSize="11pt" mb={2}>
             Gender
-          </Text>
+            </Text>
           <Flex align="center" gap={2}>
             <Icon as={MdPerson} color="blue.500" />
             <Text fontWeight="medium" fontSize="10pt" color="gray.600">
               {getGenderText()}
             </Text>
           </Flex>
-        </Flex>
+      </Flex>
       </Flex>
       <Button
         width={80}

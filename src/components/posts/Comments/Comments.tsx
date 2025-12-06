@@ -471,17 +471,17 @@ const Comments: React.FC<CommentsProps> = ({
                           ml={2}
                         >
                           <Stack spacing={2}>
-                            {repliesByParent[comment.id!].map((reply) => (
-                              <CommentItem
-                                key={reply.id}
-                                comment={reply}
-                                onDeleteComment={onDeleteComment}
-                                isLoading={false}
-                                userId={user ? String(user.id) : undefined}
-                                onVote={handleVoteComment}
-                              />
-                            ))}
-                          </Stack>
+                          {repliesByParent[comment.id!].map((reply) => (
+                            <CommentItem
+                              key={reply.id}
+                              comment={reply}
+                              onDeleteComment={onDeleteComment}
+                              isLoading={false}
+                              userId={user ? String(user.id) : undefined}
+                              onVote={handleVoteComment}
+                            />
+                          ))}
+                        </Stack>
                         </Box>
                       )}
                   </Box>
